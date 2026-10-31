@@ -17,6 +17,8 @@ Design constraints:
   a queue; every network call happens on a single background worker.
 * An error is held for ``MODEL_WATCH_ERROR_HOLD_SECONDS`` so a switch that
   follows it can be merged into one message instead of two.
+* Sends are not retried blindly: 4xx rejections and timeouts are final, since
+  a resend could duplicate a notice Lark has already accepted.
 * Credentials come from the profile ``.env`` (the gateway process does not
   export ``FEISHU_*``) and are never logged.
 """
@@ -45,8 +47,11 @@ _RATE_WINDOW_SECONDS = 60.0
 _DEDUPE_SECONDS = 60.0
 _DEFAULT_HOLD_SECONDS = 8.0
 _HTTP_TIMEOUT = 8.0
+_MAX_SESSIONS = 256  # LRU cap on remembered sessions; gateway processes run for weeks
 
 _FEISHU_ID_PREFIXES = ("oc_", "ou_", "on_")
+# Tenant-token rejection codes: the only send error worth retrying with a fresh token.
+_TOKEN_STALE_CODES = (99991661, 99991663, 99991668)
 
 
 # --------------------------------------------------------------------------- #
@@ -196,25 +201,28 @@ _primary_cache: tuple[str, str] | None | bool = False
 def configured_primary() -> tuple[str, str] | None:
     """The profile's configured route, used to recognise a recovery.
 
-    Read once: config edits land on a gateway restart anyway, and this runs on
-    the turn thread.
+    A successful read is cached. A failure is *not*: caching it would pin the
+    first observed route as "primary" for the whole process, so a transient
+    read error or a config that gets fixed is picked up on the next call.
     """
     global _primary_cache
     with _primary_lock:
         if _primary_cache is not False:
             return _primary_cache  # type: ignore[return-value]
-        _primary_cache = None
+        found: tuple[str, str] | None = None
         try:
-            import yaml  # Hermes dependency; present in the gateway venv
+            import yaml  # declared in requirements.txt; ships with Hermes
 
             data = yaml.safe_load((profile_home() / "config.yaml").read_text(encoding="utf-8")) or {}
             model = data.get("model") or {}
             default, provider = model.get("default"), model.get("provider")
             if default and provider:
-                _primary_cache = (str(default), str(provider))
+                found = (str(default), str(provider))
         except Exception as exc:  # noqa: BLE001 - a broken config must not break the hook
-            logger.debug("model-switch-notify: no primary route from config: %s", exc)
-        return _primary_cache  # type: ignore[return-value]
+            logger.warning("model-switch-notify: cannot read the configured route: %s", exc)
+        if found is not None:
+            _primary_cache = found
+        return found
 
 
 def reset_primary_cache() -> None:
@@ -279,8 +287,11 @@ def resolve_chat_id(session_id: str) -> str | None:
                 break
         except Exception as exc:  # noqa: BLE001 - a locked/gone DB is not fatal
             logger.debug("model-switch-notify: chat lookup failed in %s: %s", db, exc)
-    with _chat_lock:
-        _chat_cache[session_id] = found
+    if found is not None:
+        with _chat_lock:
+            _chat_cache[session_id] = found
+    # A miss is deliberately not cached: a locked or half-written DB must not
+    # silence a session for the rest of the process lifetime.
     return found
 
 
@@ -361,7 +372,7 @@ class FeishuClient:
                 if data.get("code") == 0:
                     return (data.get("data") or {}).get("message_id")
                 # A stale token is the one error worth retrying with a fresh one.
-                if data.get("code") in (99991661, 99991663, 99991668) and attempt == 1:
+                if data.get("code") in _TOKEN_STALE_CODES and attempt == 1:
                     with self._lock:
                         self._token, self._expires_at = None, 0.0
                     continue
@@ -376,8 +387,17 @@ class FeishuClient:
                     pass
                 logger.warning("model-switch-notify: send HTTP %s (attempt %s): %s",
                                exc.code, attempt, detail)
+                if exc.code >= 500 and attempt == 1:
+                    continue  # server-side hiccup: one retry can help
+                return None  # other 4xx: the request itself is wrong, a retry cannot fix it
             except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
                 logger.warning("model-switch-notify: send failed (attempt %s): %s", attempt, exc)
+                # A timeout may mean Feishu already accepted the message: resending
+                # would duplicate it (Lark has no idempotency key for sends).
+                timed_out = isinstance(getattr(exc, "reason", exc), TimeoutError)
+                if attempt == 1 and not timed_out:
+                    continue  # connection-level failure: one retry
+                return None
         return None
 
 
@@ -423,21 +443,35 @@ _sessions: dict[str, dict[str, Any]] = {}
 
 def _state(session_id: str) -> dict[str, Any]:
     st = _sessions.get(session_id)
-    if st is None:
-        st = {
-            "current": None,          # route that last served a call
-            "primary": None,          # configured route (or first observed)
-            "in_fallback": False,
-            "announced_fallback": False,  # a switch notice actually reached the user
-            "platform": "",           # surface of the last hook (feishu / cli / ...)
-            "sent": deque(),          # timestamps for the rate window
-            "suppressed": 0,
-            "last_switch_key": None,
-            "last_switch_at": 0.0,
-            "pending_error": None,    # dict: first_ts, count, status, reason, is_primary, seq
-            "error_seq": 0,
-        }
+    if st is not None:
+        # LRU touch so an active session survives the cap below.
+        _sessions.pop(session_id, None)
         _sessions[session_id] = st
+        return st
+    st = {
+        "current": None,          # route that last served a call
+        "primary": None,          # configured route (or first observed)
+        "in_fallback": False,
+        "announced_fallback": False,  # a switch notice actually reached the user
+        "platform": "",           # surface of the last hook (feishu / cli / ...)
+        "sent": deque(),          # timestamps for the rate window
+        "suppressed": 0,
+        "last_switch_key": None,
+        "last_switch_at": 0.0,
+        "pending_error": None,    # dict: first_ts, count, status, reason, is_primary, seq, timer
+        "error_seq": 0,
+    }
+    # Bound the bookkeeping: a long-lived gateway sees many sessions and an
+    # evicted one simply re-primes from its next hook event.
+    while len(_sessions) >= _MAX_SESSIONS:
+        oldest = next(iter(_sessions))
+        dropped = _sessions.pop(oldest)
+        pending = dropped.get("pending_error")
+        timer = pending.get("timer") if pending else None
+        if timer is not None:
+            timer.cancel()
+        logger.debug("model-switch-notify: evicted session state %s (cap %s)", oldest, _MAX_SESSIONS)
+    _sessions[session_id] = st
     return st
 
 
@@ -466,19 +500,28 @@ def _allow_send(st: dict[str, Any]) -> bool:
 def _dispatch(session_id: str, st: dict[str, Any], text: str) -> None:
     """Enqueue a message if the chat resolves and the rate window allows it."""
     platform = str(st.get("platform") or "")
-    if platform and platform != "feishu" and not _force_chat():
+    force = _force_chat()
+    if force and not force.startswith(_FEISHU_ID_PREFIXES):
+        logger.warning("model-switch-notify: MODEL_WATCH_FORCE_CHAT is not a Feishu chat id; ignoring it")
+        force = ""
+    if platform and platform != "feishu" and not force:
         logger.debug("model-switch-notify: session %s runs on %s; no Feishu target", session_id, platform)
         return
-    chat_id = _force_chat() or resolve_chat_id(session_id)
+    chat_id = force or resolve_chat_id(session_id)
     if not chat_id:
         logger.debug("model-switch-notify: no chat for session %s; dropping notice", session_id)
         return
-    if not _allow_send(st):
-        logger.info("model-switch-notify: rate-limited (%s/min); suppressed=%s", _rate_limit(), st["suppressed"])
-        return
-    if st["suppressed"]:
-        text = f"{text}\n（期间另有 {st['suppressed']} 条通知被限流省略）"
-        st["suppressed"] = 0
+    # The rate window and the suppressed counter are shared with concurrent
+    # hook callbacks (turn thread + flush timer); mutate them under the lock so
+    # two dispatches cannot both pass the limit check.
+    with _lock:
+        cur = _sessions.get(session_id) or st
+        if not _allow_send(cur):
+            logger.info("model-switch-notify: rate-limited (%s/min); suppressed=%s", _rate_limit(), cur["suppressed"])
+            return
+        if cur["suppressed"]:
+            text = f"{text}\n（期间另有 {cur['suppressed']} 条通知被限流省略）"
+            cur["suppressed"] = 0
     _ensure_worker()
     try:
         _outbox.put_nowait((chat_id, text))
@@ -509,11 +552,11 @@ def _switch_message(from_route, to_route, pending) -> str:
     return "\n".join(lines)
 
 
-def _error_message(route, pending, is_primary: bool = True) -> str:
+def _error_message(route, pending, is_primary: bool = True, recovered: bool = False) -> str:
     title = "🔴 主模型调用失败" if is_primary else "🔴 当前模型调用失败"
     lines = [title, f"模型：{_route_label(*route)}"]
     lines.append(f"错误：{_reason_text(pending)}")
-    lines.append("本轮继续重试，若持续失败会自动切换模型")
+    lines.append("✅ 已自动重试成功" if recovered else "本轮继续重试，若持续失败会自动切换模型")
     lines.append(f"时间：{time.strftime('%Y-%m-%d %H:%M:%S')}")
     return "\n".join(lines)
 
@@ -526,14 +569,30 @@ def _recovery_message(route) -> str:
     ])
 
 
+def _take_pending(st: dict[str, Any]) -> dict[str, Any] | None:
+    """Detach a held error and stop its flush timer (a switch or retry ended it)."""
+    pending = st["pending_error"]
+    if pending is None:
+        return None
+    st["pending_error"] = None
+    timer = pending.get("timer")
+    if timer is not None:
+        timer.cancel()
+    return pending
+
+
 def _flush_error(session_id: str, seq: int) -> None:
     """Hold window expired: the error did not become a switch, so report it alone."""
     with _lock:
         st = _sessions.get(session_id)
-        if not st or not st["pending_error"] or st["pending_error"]["seq"] != seq:
+        if st is None:
             return
-        pending = st["pending_error"]
-        st["pending_error"] = None
+        held = st["pending_error"]
+        if held is None or held["seq"] != seq:
+            return
+        pending = _take_pending(st)
+        if pending is None:  # unreachable under the lock; keeps type-checkers calm
+            return
         route = st["current"]
         text = _error_message(route, pending, bool(pending.get("is_primary", True))) if route else None
     if text:
@@ -568,16 +627,17 @@ def on_post_api_request(**kwargs: Any) -> None:
         if st["current"] is None:
             st["current"] = route
             st["in_fallback"] = not is_primary
+            # A session that *starts* on a fallback route counts as announced:
+            # returning to the primary later is a recovery, not a fresh switch.
+            st["announced_fallback"] = not is_primary
             return
         if st["current"] == route:
             # A success on the same route closes a held error: report it as a
             # retry that worked, which is the only "error, no switch" evidence.
-            pending = st["pending_error"]
+            pending = _take_pending(st)
             if pending:
-                st["pending_error"] = None
-                reason = (pending.get("reason") or "") + " · 已自动重试成功"
                 notice = _error_message(
-                    route, {**pending, "reason": reason.strip(" ·")}, bool(pending.get("is_primary", True))
+                    route, pending, bool(pending.get("is_primary", True)), recovered=True
                 )
         else:
             from_route, st["current"] = st["current"], route
@@ -585,8 +645,7 @@ def on_post_api_request(**kwargs: Any) -> None:
             key = (from_route, route)
             dedupe = st["last_switch_key"] == key and now - st["last_switch_at"] < _DEDUPE_SECONDS
             st["last_switch_key"], st["last_switch_at"] = key, now
-            pending = st["pending_error"]
-            st["pending_error"] = None
+            pending = _take_pending(st)
             was_fallback = st["in_fallback"]
             st["in_fallback"] = not is_primary
             if dedupe:
@@ -632,7 +691,11 @@ def on_api_request_error(**kwargs: Any) -> None:
         if pending is None:
             pending = {"first_ts": time.time(), "count": 0, "seq": seq, "is_primary": is_primary}
             st["pending_error"] = pending
-            threading.Timer(max(0.1, _hold_seconds()), _flush_error, args=(session_id, seq)).start()
+            # Remember the handle so a consuming switch/retry can cancel it;
+            # the seq guard in _flush_error stays as the backstop.
+            timer = threading.Timer(max(0.1, _hold_seconds()), _flush_error, args=(session_id, seq))
+            pending["timer"] = timer
+            timer.start()
         pending["count"] += 1
         pending["status"] = kwargs.get("status_code")
         reason = kwargs.get("reason")

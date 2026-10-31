@@ -140,3 +140,15 @@ def test_read_dotenv_ignores_comments_and_quotes(tmp_path):
     env.write_text('# comment\nFEISHU_APP_ID="cli_1"\nFEISHU_APP_SECRET=\'s3cret\'\n\n', encoding="utf-8")
 
     assert msn._read_dotenv(env) == {"FEISHU_APP_ID": "cli_1", "FEISHU_APP_SECRET": "s3cret"}
+
+
+def test_primary_read_failure_is_not_sticky(tmp_path, monkeypatch):
+    """A broken config must not pin 'first observed route' as primary forever."""
+    monkeypatch.setattr(msn, "profile_home", lambda: tmp_path)
+    monkeypatch.setattr(msn, "configured_primary", getattr(msn, "_REAL_CONFIGURED_PRIMARY"))
+
+    assert msn.configured_primary() is None  # no config.yaml yet: not cached
+
+    (tmp_path / "config.yaml").write_text("model:\n  default: m1\n  provider: p1\n", encoding="utf-8")
+
+    assert msn.configured_primary() == ("m1", "p1")  # the earlier miss was not pinned

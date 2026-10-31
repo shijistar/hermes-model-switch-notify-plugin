@@ -13,6 +13,10 @@ if str(ROOT) not in sys.path:
 
 import model_switch_notify as msn  # noqa: E402
 
+# The autouse fixture below patches configured_primary per test; stash the real
+# implementation on the module so the cache-behaviour test can exercise it.
+setattr(msn, "_REAL_CONFIGURED_PRIMARY", msn.configured_primary)
+
 
 @pytest.fixture(autouse=True)
 def clean_plugin_state(monkeypatch):

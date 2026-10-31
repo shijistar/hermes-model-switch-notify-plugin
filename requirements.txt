@@ -1,5 +1,7 @@
 # Runtime dependencies for the model-switch-notify plugin.
 #
-# None: the plugin uses only the Python standard library. PyYAML is imported to
-# read the profile config.yaml and already ships with Hermes; it is not listed
-# here so the plugin keeps working in a bare interpreter.
+# The hook payloads, chat lookup and Feishu client are stdlib-only. PyYAML is
+# required to read the profile config.yaml (the configured primary route); it
+# ships with Hermes, and is declared here so a bare-interpreter install fails
+# loudly instead of degrading silently to "first observed route is primary".
+PyYAML>=6.0

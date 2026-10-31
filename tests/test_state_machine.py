@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 
 import pytest
@@ -168,3 +169,62 @@ def test_disabled_switch_suppresses_everything(sent, monkeypatch, enabled):
     post(model=FALLBACK[0], provider=FALLBACK[1])
 
     assert sent == []
+
+
+def test_session_starting_on_fallback_reports_recovery(sent):
+    """A session born on a fallback route: returning to the primary is a recovery."""
+    post(model=FALLBACK[0], provider=FALLBACK[1])
+    post()
+
+    assert len(sent) == 1
+    assert "已切回主模型" in sent[0][1]
+    assert "已切换" not in sent[0][1]
+
+
+def test_session_state_is_capped():
+    for index in range(msn._MAX_SESSIONS + 20):
+        msn._state(f"s-{index}")
+
+    assert len(msn._sessions) == msn._MAX_SESSIONS
+    assert "s-0" not in msn._sessions                      # oldest evicted
+    assert f"s-{msn._MAX_SESSIONS + 19}" in msn._sessions  # newest kept
+    assert msn._state("s-0")["current"] is None            # evicted state re-primes
+
+
+def test_concurrent_dispatch_respects_the_rate_window(monkeypatch):
+    """Turn thread and flush timer can dispatch at once; the cap must hold."""
+    captured: list[tuple[str, str]] = []
+    monkeypatch.setenv("MODEL_WATCH_RATE_PER_MIN", "10")
+    monkeypatch.setattr(msn, "resolve_chat_id", lambda sid: "oc_race")
+    monkeypatch.setattr(msn, "_ensure_worker", lambda: None)
+    monkeypatch.setattr(msn._outbox, "put_nowait", lambda item: captured.append(item))
+
+    st = msn._state("race-session")
+    st["platform"] = "feishu"
+
+    def spam():
+        for index in range(8):
+            msn._dispatch("race-session", st, f"m-{index}")
+
+    threads = [threading.Thread(target=spam) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert len(captured) == 10
+    assert st["suppressed"] == 6
+
+
+def test_force_chat_with_invalid_prefix_is_ignored(monkeypatch):
+    monkeypatch.setenv("MODEL_WATCH_FORCE_CHAT", "session-not-a-chat")
+    captured: list[tuple[str, str]] = []
+    monkeypatch.setattr(msn, "resolve_chat_id", lambda sid: "oc_real")
+    monkeypatch.setattr(msn, "_ensure_worker", lambda: None)
+    monkeypatch.setattr(msn._outbox, "put_nowait", lambda item: captured.append(item))
+
+    st = msn._state("force-session")
+    st["platform"] = "feishu"
+    msn._dispatch("force-session", st, "hello")
+
+    assert captured and captured[0][0] == "oc_real"
