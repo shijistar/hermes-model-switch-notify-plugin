@@ -40,7 +40,7 @@ hermes-model-switch-notify-plugin/
 ## Build & test
 
 ```bash
-python3 -m pytest tests/ -q     # 44 tests, no network access
+python3 -m pytest tests/ -q     # offline; no network access
 python3 -m pytest tests/ -v     # per-test detail
 ```
 

@@ -28,15 +28,16 @@ the per-call hooks and reports each event as it happens.
 - Hermes Agent with the Feishu platform configured for the target profile
   (`FEISHU_APP_ID`, `FEISHU_APP_SECRET`, optional `FEISHU_DOMAIN` in the
   profile `.env`).
-- Python 3.10+ (stdlib only; PyYAML comes with Hermes and is used to read the
-  profile config).
+- Python 3.10+ and PyYAML (both ship with Hermes; see `requirements.txt` —
+  PyYAML reads the profile `config.yaml`).
 
 ## Quick start
 
 ```bash
-# From the repository root: symlink the plugin and its skill into a profile,
-# then enable it (see PLUGIN.md for --install-plugin and --profile variants).
-./post-install.sh
+# From the repository root: symlink the plugin and its skill into a profile
+# and enable it. Omit --profile for the default profile; see PLUGIN.md for
+# the --install-plugin and --hermes-home variants.
+./post-install.sh --profile <name>
 
 # Verify registration
 hermes plugins info model-switch-notify
@@ -81,7 +82,7 @@ All settings are environment variables in the profile `.env` (see
 | `MODEL_WATCH_DRY_RUN` | `0` | Log instead of sending |
 | `MODEL_WATCH_RATE_PER_MIN` | `10` | Per-session send budget |
 | `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8` | Merge window for "error → switch" |
-| `MODEL_WATCH_FORCE_CHAT` | empty | Override the target chat (testing) |
+| `MODEL_WATCH_FORCE_CHAT` | empty | Force a chat id (`oc_…`) for testing; bypasses platform gating — testing only |
 
 ## Safety
 
@@ -95,7 +96,7 @@ All settings are environment variables in the profile `.env` (see
 ## Development
 
 ```bash
-python3 -m pytest tests/ -q     # 44 tests, no network
+python3 -m pytest tests/ -q     # offline, no network
 python3 -m pytest tests/ -v     # per-test detail
 ```
 

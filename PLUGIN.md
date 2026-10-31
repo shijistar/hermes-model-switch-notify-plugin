@@ -18,7 +18,7 @@ Two supported layouts:
 **Symlinked checkout (development, recommended for this repo)**
 
 ```bash
-./post-install.sh --profile coder
+./post-install.sh --profile <name>
 ```
 
 The script:
@@ -61,7 +61,7 @@ the profile that runs the plugin.
 | `MODEL_WATCH_DRY_RUN` | `0` | Log `would send` lines instead of calling Feishu |
 | `MODEL_WATCH_RATE_PER_MIN` | `10` | Per-session sends per 60s; overflow is counted |
 | `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8` | How long an error waits for a switch before it is reported alone |
-| `MODEL_WATCH_FORCE_CHAT` | empty | Force a chat id (`oc_…`) for testing; bypasses platform gating |
+| `MODEL_WATCH_FORCE_CHAT` | empty | Force a chat id (`oc_…`) for testing; bypasses platform gating, so notices from non-Feishu sessions can be pushed into the forced chat — testing only |
 
 The primary route is read from the profile `config.yaml`:
 
@@ -112,8 +112,25 @@ api_request_error(status_code, reason, retryable, …)
   whose `source` is not `feishu` (CLI/one-shot runs) are rejected, as are ids
   without an `oc_`/`ou_`/`on_` prefix.
 - The sender caches the tenant token until 60s before expiry and retries once
-  with a fresh token when Feishu rejects it.
+  with a fresh token when Feishu rejects it. Server errors and connection
+  failures retry once; 4xx rejections and timeouts are final, since a resend
+  could duplicate a message Feishu has already accepted.
 - All sends run on one daemon worker; the hook callbacks only enqueue.
+
+## Known limitations
+
+- Mixture / aggregator routes (`mixture_of_agents` and friends) report the
+  route that served each call. When the router mixes models across calls in
+  one turn, those per-call changes arrive as ordinary switch notices. Point
+  the plugin at a single-route profile if that is too chatty.
+- When the profile `config.yaml` cannot be read, there is no configured
+  primary: the first observed route is treated as primary for that session,
+  and a later return to the real primary may be reported as a switch rather
+  than a recovery. The failed read is retried (not cached), so the next
+  session picks up a fixed config.
+- Per-session bookkeeping is capped (256 sessions, LRU). A session evicted
+  between two hook events re-primes from scratch, which can miss one notice
+  at the boundary.
 
 ## Troubleshooting
 

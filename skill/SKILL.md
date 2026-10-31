@@ -24,10 +24,13 @@ fails, or the route recovers.
 ## Install
 
 ```bash
-cd ~/.hermes/workspace/repository/hermes-model-switch-notify-plugin
-./post-install.sh --profile coder          # symlink + skill link + enable
+cd <path-to-checkout>                  # wherever this repository was cloned
+./post-install.sh --profile <name>     # default profile when --profile is omitted
 hermes plugins info model-switch-notify    # Status: enabled
 ```
+
+`--hermes-home DIR` and an exported `HERMES_HOME` are honored, so the install
+lands in the same home the plugin reads at runtime.
 
 The profile `.env` must carry `FEISHU_APP_ID` and `FEISHU_APP_SECRET`
 (`FEISHU_DOMAIN=lark` for Lark tenants). The bot must already be in the target
@@ -58,7 +61,7 @@ Profile `.env` variables:
 | `MODEL_WATCH_DRY_RUN` | `0` | Log instead of sending |
 | `MODEL_WATCH_RATE_PER_MIN` | `10` | Per-session per-minute budget |
 | `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8` | Merge window before a lone error is sent |
-| `MODEL_WATCH_FORCE_CHAT` | empty | Force a target chat (testing) |
+| `MODEL_WATCH_FORCE_CHAT` | empty | Force a chat id (`oc_…`); bypasses platform gating — testing only |
 
 "Primary" is `model.default` + `model.provider` from the profile
 `config.yaml`; the model comparison ignores a `provider/` prefix and case.
@@ -66,15 +69,22 @@ Profile `.env` variables:
 ## Verify
 
 ```bash
-python3 -m pytest tests/ -q          # 44 tests, no network
+python3 -m pytest tests/ -q          # offline, no network
 hermes plugins info model-switch-notify
 ```
 
-End-to-end check without disturbing a live session: set
-`MODEL_WATCH_DRY_RUN=1`, run one turn, and look for
-`model-switch-notify[dry-run]` lines in the agent log. To confirm delivery,
-send a test text through the profile bot to the chat id and check the returned
-`message_id`.
+End-to-end check without sending anything. A normal turn only produces a
+notice when the route actually changes or a call fails, so force one switch
+with a model that cannot exist (dry-run still resolves the target chat):
+
+```bash
+MODEL_WATCH_DRY_RUN=1 MODEL_WATCH_FORCE_CHAT=<oc_chat_id> \
+  hermes -p <profile> -z "reply with exactly: ok" -m nonexistent-model-xyz
+```
+
+Then look for `model-switch-notify[dry-run]` lines in the agent log. To
+confirm real delivery, run the same command without `MODEL_WATCH_DRY_RUN` and
+check that the chat receives the notice.
 
 ## Troubleshooting
 

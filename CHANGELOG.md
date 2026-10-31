@@ -22,3 +22,16 @@ All notable changes to this project are documented here. Headings are dates
 - Background delivery worker: hook callbacks never perform network I/O.
 - Tenant-token caching, one retry on a rejected token, and truncated error
   bodies in logs.
+- Delivery retry policy: server errors and connection failures retry once;
+  4xx rejections and timeouts are final (a resend could duplicate an accepted
+  message — Lark has no idempotency key for sends).
+- Concurrency and lifecycle hardening: the rate window mutates under the
+  session lock, flush timers are cancelled when an error is consumed,
+  per-session bookkeeping is capped (256, LRU), and a session that starts on a
+  fallback route reports its return to the primary as a recovery.
+- Failed lookups are never cached: a transient DB miss or an unreadable
+  `config.yaml` is retried instead of pinning a wrong chat or primary route.
+- PyYAML is a declared runtime dependency (`requirements.txt`).
+- The installer honors an exported `HERMES_HOME`, passes the selected profile
+  to every Hermes command it runs, and never links a plugin directory onto
+  itself.
