@@ -1,0 +1,1 @@
+# hermes-model-switch-notify-plugin
