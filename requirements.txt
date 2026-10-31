@@ -1,0 +1,5 @@
+# Runtime dependencies for the model-switch-notify plugin.
+#
+# None: the plugin uses only the Python standard library. PyYAML is imported to
+# read the profile config.yaml and already ships with Hermes; it is not listed
+# here so the plugin keeps working in a bare interpreter.
