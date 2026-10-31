@@ -49,6 +49,10 @@ die()  { printf '\033[1;31m[error]\033[0m %s\n' "$*" >&2; exit 1; }
 # ---------------------------------------------------------------- hermes home
 if [[ -n "$HERMES_HOME_ARG" ]]; then
   HERMES_HOME="$HERMES_HOME_ARG"
+elif [[ -n "${HERMES_HOME:-}" && -d "${HERMES_HOME}" ]]; then
+  # An exported HERMES_HOME is the same value the plugin itself reads at
+  # runtime; honor it so install and runtime agree on the target.
+  HERMES_HOME="$HERMES_HOME"
 elif [[ -d "$HOME/.hermes" ]]; then
   HERMES_HOME="$HOME/.hermes"
 else
@@ -76,6 +80,13 @@ fi
 PLUGIN_DIR="$PROFILE_DIR/plugins/model-switch-notify"
 SKILL_LINK="$PROFILE_DIR/skills/devops/model-switch-notify"
 
+# The selected profile must apply to *every* Hermes command below, including
+# `plugins install` (it defaults to the currently active profile otherwise).
+profile_args=()
+if [[ -n "$PROFILE_NAME" ]]; then
+  profile_args=(-p "$PROFILE_NAME")
+fi
+
 info "HERMES_HOME = $HERMES_HOME"
 info "Profile dir = $PROFILE_DIR"
 info "Plugin src  = $SCRIPT_DIR"
@@ -85,15 +96,26 @@ mkdir -p "$PROFILE_DIR/plugins" "$PROFILE_DIR/skills/devops"
 # ------------------------------------------------------------- 1. plugin
 if [[ "$INSTALL_PLUGIN" -eq 1 ]]; then
   info "Installing with hermes plugins install ..."
-  HERMES_HOME="$HERMES_HOME" hermes plugins install "file://$SCRIPT_DIR" --enable
+  HERMES_HOME="$HERMES_HOME" hermes "${profile_args[@]}" plugins install "file://$SCRIPT_DIR" --enable
 else
-  if [[ -e "$PLUGIN_DIR" && ! -L "$PLUGIN_DIR" ]]; then
-    BACKUP="$PLUGIN_DIR.bak.$(date +%Y%m%d-%H%M%S)"
-    mv "$PLUGIN_DIR" "$BACKUP"
-    ok "Moved existing plugin directory to $BACKUP (nothing deleted)"
+  script_real="$(cd "$SCRIPT_DIR" && pwd -P)"
+  installed_real=""
+  if [[ -e "$PLUGIN_DIR" || -L "$PLUGIN_DIR" ]]; then
+    installed_real="$(cd "$PLUGIN_DIR" 2>/dev/null && pwd -P || true)"
   fi
-  ln -sfn "$SCRIPT_DIR" "$PLUGIN_DIR"
-  ok "Linked $PLUGIN_DIR -> $SCRIPT_DIR"
+  if [[ -n "$installed_real" && "$installed_real" == "$script_real" ]]; then
+    # Running from the installed plugin directory itself: linking it onto
+    # itself would create a self-referential or dangling symlink.
+    ok "Plugin directory already is this checkout; keeping it"
+  else
+    if [[ -e "$PLUGIN_DIR" && ! -L "$PLUGIN_DIR" ]]; then
+      BACKUP="$PLUGIN_DIR.bak.$(date +%Y%m%d-%H%M%S)"
+      mv "$PLUGIN_DIR" "$BACKUP"
+      ok "Moved existing plugin directory to $BACKUP (nothing deleted)"
+    fi
+    ln -sfn "$SCRIPT_DIR" "$PLUGIN_DIR"
+    ok "Linked $PLUGIN_DIR -> $SCRIPT_DIR"
+  fi
 fi
 
 # -------------------------------------------------------------- 2. skill
@@ -108,11 +130,7 @@ else
 fi
 
 # ------------------------------------------------------------- 3. enable
-if [[ -n "$PROFILE_NAME" ]]; then
-  HERMES_HOME="$HERMES_HOME" hermes -p "$PROFILE_NAME" plugins enable model-switch-notify
-else
-  HERMES_HOME="$HERMES_HOME" hermes plugins enable model-switch-notify
-fi
+HERMES_HOME="$HERMES_HOME" hermes "${profile_args[@]}" plugins enable model-switch-notify
 
 # ------------------------------------------------------------ 4. summary
 printf '\033[1;32m\nInstall summary\033[0m\n'
