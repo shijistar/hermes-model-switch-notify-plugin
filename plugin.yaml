@@ -1,0 +1,8 @@
+name: model-switch-notify
+version: 0.1.0
+description: 'Push a Feishu notice to the active chat when the model route switches, the primary model fails, or the primary recovers.'
+provides_hooks:
+  - post_api_request
+  - api_request_error
+platforms:
+  - linux
