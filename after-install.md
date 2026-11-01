@@ -1,7 +1,9 @@
 # after-install.md
 
-The plugin is installed. Finish setup with the bundled one-shot installer, run
-from the repository checkout (not from inside an installed plugin directory):
+The plugin is installed. Finish setup with the bundled one-shot installer. Run
+it from the repository checkout or from an installed plugin directory — a
+Hermes-managed install is a full checkout, and the script detects that the
+plugin directory already is its own source:
 
 ```bash
 cd <path/to/hermes-model-switch-notify-plugin>
@@ -11,8 +13,15 @@ cd <path/to/hermes-model-switch-notify-plugin>
 Without `--profile` the script targets the default profile. The plugin is
 linked into `<hermes-home>/plugins/model-switch-notify` (default profile) or
 `<hermes-home>/profiles/<name>/plugins/model-switch-notify` (named profile).
-`--hermes-home DIR` and an exported `HERMES_HOME` are both honored, so the
-install lands in the same home the plugin reads at runtime.
+`--hermes-home DIR` and an exported `HERMES_HOME` are both honored, in either
+the root form or the profile-scoped form Hermes uses at runtime
+(`<hermes-home>/profiles/<name>`), so the install lands in the same home the
+plugin reads.
+
+Choosing a home only decides where the files land; it does not move a gateway
+that is already running. A gateway loads plugins from the home it was started
+with, so when you install into a non-default home, restart the gateway with the
+same `HERMES_HOME` (or `--profile <name>`) or it will not see the plugin.
 
 What it does:
 
@@ -25,7 +34,8 @@ What it does:
 
 Then confirm the profile `.env` carries `FEISHU_APP_ID` and `FEISHU_APP_SECRET`
 (`FEISHU_DOMAIN=lark` for Lark tenants), check
-`hermes plugins info model-switch-notify`, and restart the gateway
-(`/restart`) if hooks were wired by an older build.
+`hermes -p <name> plugins info model-switch-notify` (drop `-p <name>` for the
+default profile), and restart the gateway (`/restart`) if hooks were wired by
+an older build.
 
 Verify the install with `python3 -m pytest tests/ -q`.

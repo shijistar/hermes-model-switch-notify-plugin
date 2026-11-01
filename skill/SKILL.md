@@ -1,7 +1,7 @@
 ---
 name: model-switch-notify
 description: Install and operate Feishu model-switch alerts.
-version: 1.0.0
+version: 1.0.1
 author: Hermes Agent / Fengbao Li
 metadata:
   hermes:
@@ -26,11 +26,15 @@ fails, or the route recovers.
 ```bash
 cd <path-to-checkout>                  # wherever this repository was cloned
 ./post-install.sh --profile <name>     # default profile when --profile is omitted
-hermes plugins info model-switch-notify    # Status: enabled
+hermes -p <name> plugins info model-switch-notify    # Status: enabled
 ```
 
-`--hermes-home DIR` and an exported `HERMES_HOME` are honored, so the install
-lands in the same home the plugin reads at runtime.
+`--hermes-home DIR` and an exported `HERMES_HOME` are honored, either as the
+Hermes root or as a profile-scoped home (`<root>/profiles/<name>`), so the
+install lands in the same home the plugin reads at runtime. A running gateway
+keeps the home it was started with — restart it with the same home (or
+`--profile <name>`) after installing elsewhere. Drop `-p <name>` for the
+default profile.
 
 The profile `.env` must carry `FEISHU_APP_ID` and `FEISHU_APP_SECRET`
 (`FEISHU_DOMAIN=lark` for Lark tenants). The bot must already be in the target
@@ -70,7 +74,7 @@ Profile `.env` variables:
 
 ```bash
 python3 -m pytest tests/ -q          # offline, no network
-hermes plugins info model-switch-notify
+hermes -p <name> plugins info model-switch-notify
 ```
 
 End-to-end check without sending anything. A normal turn only produces a
@@ -90,7 +94,7 @@ check that the chat receives the notice.
 
 | Symptom | Action |
 | --- | --- |
-| No notification | `hermes plugins info`; reload with disable/enable or `/restart` |
+| No notification | `hermes -p <name> plugins info`; reload with disable/enable or `/restart` |
 | Edits ignored | `rm -rf <plugin>/__pycache__` — a stale `.pyc` shadows the source |
 | `HTTP 400 invalid receive_id` | The target was a session id, not a chat id; only `source=feishu` rows with an `oc_`/`ou_`/`on_` prefix are valid |
 | CLI runs silent | Expected: one-shot sessions have `platform=cli` and no Feishu target |
@@ -99,7 +103,7 @@ check that the chat receives the notice.
 ## Uninstall
 
 ```bash
-hermes plugins disable model-switch-notify
+hermes -p <name> plugins disable model-switch-notify
 rm <profile>/plugins/model-switch-notify      # symlink only
 rm <profile>/skills/devops/model-switch-notify
 ```

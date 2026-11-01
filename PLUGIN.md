@@ -37,16 +37,22 @@ hermes plugins install shijistar/hermes-model-switch-notify-plugin --enable
 ./post-install.sh --hermes-home "$HERMES_HOME"
 ```
 
-Verify:
+`--hermes-home` (or an exported `HERMES_HOME`) accepts either the Hermes root
+or a profile-scoped home (`<root>/profiles/<name>`); a profile-scoped home also
+names the profile that gets enabled. It only chooses where the files land — a
+gateway that is already running keeps loading the home it was started with, so
+restart it with the same home (or `-p <name>`) after installing elsewhere.
+
+Verify (add `-p <name>` when the target is not the default profile):
 
 ```bash
-hermes plugins info model-switch-notify     # Status: enabled
-hermes plugins list | grep model-switch
+hermes -p <name> plugins info model-switch-notify     # Status: enabled
+hermes -p <name> plugins list | grep model-switch
 ```
 
 Runtime state is only registered on plugin load. A fresh enable hot-reloads the
 hooks; after replacing code, reload with
-`hermes plugins disable model-switch-notify && hermes plugins enable model-switch-notify`.
+`hermes -p <name> plugins disable model-switch-notify && hermes -p <name> plugins enable model-switch-notify`.
 A full gateway restart (`/restart`) is the fallback when a reload reports that
 previously wired hooks stay until restart.
 
@@ -136,7 +142,7 @@ api_request_error(status_code, reason, retryable, …)
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| No messages at all | Plugin not loaded in the gateway | `hermes plugins info model-switch-notify`; reload or `/restart` |
+| No messages at all | Plugin not loaded in the gateway | `hermes -p <name> plugins info model-switch-notify`; reload or `/restart` |
 | Code changes have no effect | A stale `__pycache__` next to the plugin | `rm -rf <plugin>/__pycache__`, then reload |
 | `HTTP 400 … invalid receive_id` | Sending to a session id instead of a chat id | Check `sessions.source`; use a Feishu session or `MODEL_WATCH_FORCE_CHAT` |
 | Nothing on CLI runs | By design: `platform=cli` has no Feishu target | Test from a Feishu chat |
@@ -146,7 +152,7 @@ api_request_error(status_code, reason, retryable, …)
 ## Uninstall
 
 ```bash
-hermes plugins disable model-switch-notify
+hermes -p <name> plugins disable model-switch-notify
 rm -rf <profile>/plugins/model-switch-notify     # symlink only; the repo stays
 ```
 
