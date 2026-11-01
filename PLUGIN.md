@@ -124,10 +124,10 @@ api_request_error(status_code, reason, retryable, …)
   one turn, those per-call changes arrive as ordinary switch notices. Point
   the plugin at a single-route profile if that is too chatty.
 - When the profile `config.yaml` cannot be read, there is no configured
-  primary: the first observed route is treated as primary for that session,
-  and a later return to the real primary may be reported as a switch rather
-  than a recovery. The failed read is retried (not cached), so the next
-  session picks up a fixed config.
+  primary: the first observed route is used as the baseline, and a later move
+  to the real primary is reported as a switch rather than a recovery. The
+  failed read is retried (not cached), and a session re-pins its baseline on
+  the next call once the config becomes readable.
 - Per-session bookkeeping is capped (256 sessions, LRU). A session evicted
   between two hook events re-primes from scratch, which can miss one notice
   at the boundary.

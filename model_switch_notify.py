@@ -451,6 +451,7 @@ def _state(session_id: str) -> dict[str, Any]:
     st = {
         "current": None,          # route that last served a call
         "primary": None,          # configured route (or first observed)
+        "primary_source": None,   # "config" once authoritative, else "observed"
         "in_fallback": False,
         "announced_fallback": False,  # a switch notice actually reached the user
         "platform": "",           # surface of the last hook (feishu / cli / ...)
@@ -617,8 +618,24 @@ def on_post_api_request(**kwargs: Any) -> None:
     with _lock:
         st = _state(session_id)
         st["platform"] = str(kwargs.get("platform") or st.get("platform") or "")
-        if st["primary"] is None:
-            st["primary"] = configured_primary() or route
+        if st["primary"] is None or st.get("primary_source") != "config":
+            # Retry the config while the baseline is not authoritative: a
+            # session that primed during a broken config re-pins as soon as
+            # the config becomes readable, instead of keeping the first
+            # observed route as "primary" for its whole lifetime.
+            configured = configured_primary()
+            if configured is not None:
+                st["primary"] = configured
+                st["primary_source"] = "config"
+                if st["current"] is not None:
+                    cur = st["current"]
+                    st["in_fallback"] = not (
+                        _norm_model(cur[0]) == _norm_model(configured[0])
+                        and _norm_provider(cur[1]) == _norm_provider(configured[1])
+                    )
+            elif st["primary"] is None:
+                st["primary"] = route
+                st["primary_source"] = "observed"
         primary = st["primary"]
         is_primary = (
             _norm_model(route[0]) == _norm_model(primary[0])

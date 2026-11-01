@@ -30,7 +30,9 @@ All notable changes to this project are documented here. Headings are dates
   per-session bookkeeping is capped (256, LRU), and a session that starts on a
   fallback route reports its return to the primary as a recovery.
 - Failed lookups are never cached: a transient DB miss or an unreadable
-  `config.yaml` is retried instead of pinning a wrong chat or primary route.
+  `config.yaml` is retried instead of pinning a wrong chat or primary route,
+  and a session whose baseline came from the first observed route re-pins to
+  the configured primary once the config reads.
 - PyYAML is a declared runtime dependency (`requirements.txt`).
 - The installer honors an exported `HERMES_HOME`, passes the selected profile
   to every Hermes command it runs, and never links a plugin directory onto

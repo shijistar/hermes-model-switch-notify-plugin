@@ -181,6 +181,27 @@ def test_session_starting_on_fallback_reports_recovery(sent):
     assert "已切换" not in sent[0][1]
 
 
+def test_session_re_pins_primary_once_config_is_readable(sent, monkeypatch):
+    """A session primed during a broken config re-baselines when it heals.
+
+    The first observed route becomes the baseline while the config is
+    unreadable; the baseline is re-pinned on the next call once the config
+    reads, so the move to the real primary is reported (honestly labelled as
+    a switch: the user never saw a fallback notice for this session).
+    """
+    monkeypatch.setattr(msn, "configured_primary", lambda: None)
+    post(model=FALLBACK[0], provider=FALLBACK[1])   # observed baseline = fallback route
+    monkeypatch.setattr(msn, "configured_primary", lambda: PRIMARY)
+    post(model=FALLBACK[0], provider=FALLBACK[1])   # same route: silent re-pin
+    post()                                          # to the configured primary
+
+    assert len(sent) == 1
+    text = sent[0][1]
+    assert "已切换" in text
+    assert "已切回主模型" not in text
+    assert FALLBACK[0] in text and PRIMARY[0] in text
+
+
 def test_session_state_is_capped():
     for index in range(msn._MAX_SESSIONS + 20):
         msn._state(f"s-{index}")
