@@ -96,6 +96,7 @@ check that the chat receives the notice.
 | --- | --- |
 | No notification | `hermes -p <name> plugins info`; reload with disable/enable or `/restart` |
 | Edits ignored | `rm -rf <plugin>/__pycache__` — a stale `.pyc` shadows the source |
+| Old version reported | A `plugins/*.bak.*` copy shadows the symlink; move it to `<profile>/plugin-backups/` and reload |
 | `HTTP 400 invalid receive_id` | The target was a session id, not a chat id; only `source=feishu` rows with an `oc_`/`ou_`/`on_` prefix are valid |
 | CLI runs silent | Expected: one-shot sessions have `platform=cli` and no Feishu target |
 | Duplicate end-of-turn notice | Hermes' built-in fallback notice still fires; optionally set `suppress_warning_notifications: true` for feishu |

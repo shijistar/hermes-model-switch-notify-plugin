@@ -130,7 +130,11 @@ else
     ok "Plugin directory already is this checkout; keeping it"
   else
     if [[ -e "$PLUGIN_DIR" && ! -L "$PLUGIN_DIR" ]]; then
-      BACKUP="$PLUGIN_DIR.bak.$(date +%Y%m%d-%H%M%S)"
+      # Keep the backup out of plugins/: Hermes scans every directory there, and a
+      # sibling copy with the same manifest name shadows the real plugin (the last
+      # manifest with a key wins).
+      mkdir -p "$PROFILE_DIR/plugin-backups"
+      BACKUP="$PROFILE_DIR/plugin-backups/model-switch-notify.bak.$(date +%Y%m%d-%H%M%S)"
       mv "$PLUGIN_DIR" "$BACKUP"
       ok "Moved existing plugin directory to $BACKUP (nothing deleted)"
     fi
@@ -138,6 +142,13 @@ else
     ok "Linked $PLUGIN_DIR -> $SCRIPT_DIR"
   fi
 fi
+
+# Older versions of this script left backups inside plugins/. Never delete them,
+# but do not let them silently shadow this install either.
+for stale in "$PROFILE_DIR/plugins/model-switch-notify.bak."*; do
+  [[ -e "$stale" ]] || continue
+  warn "Backup $stale sits inside plugins/ and shadows this plugin; move it to $PROFILE_DIR/plugin-backups/ and reload"
+done
 
 # -------------------------------------------------------------- 2. skill
 if [[ -L "$SKILL_LINK" ]]; then

@@ -26,8 +26,8 @@ same `HERMES_HOME` (or `--profile <name>`) or it will not see the plugin.
 What it does:
 
 1. Links this repository into the profile's plugins directory (an existing
-   real directory is moved to `*.bak.<timestamp>`, never deleted; a plugin
-   directory that already is this checkout is left untouched).
+   real directory is moved to `<profile>/plugin-backups/`, never deleted; a
+   plugin directory that already is this checkout is left untouched).
 2. Links `skill/` into the profile's `skills/devops/`.
 3. Enables the plugin in the profile config, passing `-p <name>` to every
    Hermes command it runs.

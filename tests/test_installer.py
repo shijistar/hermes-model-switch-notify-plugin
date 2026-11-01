@@ -97,6 +97,24 @@ def test_explicit_profile_wins_over_profile_scoped_home(tmp_path, hermes_stub):
     assert "-p other plugins enable model-switch-notify" in log.read_text()
 
 
+def test_existing_directory_is_backed_up_outside_plugins(tmp_path, hermes_stub):
+    """A backup left in plugins/ would shadow the real plugin (same manifest key)."""
+    bin_dir, _log = hermes_stub
+    profile = tmp_path / "hermes" / "profiles" / "coder"
+    plugin_dir = profile / "plugins" / "model-switch-notify"
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "plugin.yaml").write_text("name: model-switch-notify\nversion: 0.0.1\n")
+
+    result = _run(bin_dir, profile, "--profile", "coder")
+
+    assert result.returncode == 0, result.stderr
+    backups = list((profile / "plugin-backups").glob("model-switch-notify.bak.*"))
+    assert len(backups) == 1
+    assert (backups[0] / "plugin.yaml").is_file()
+    assert plugin_dir.is_symlink()
+    assert not list((profile / "plugins").glob("model-switch-notify.bak.*"))
+
+
 def test_runs_from_an_installed_plugin_directory(tmp_path, hermes_stub):
     """A Hermes-managed install is a full checkout, so setup may run from it."""
     bin_dir, _log = hermes_stub

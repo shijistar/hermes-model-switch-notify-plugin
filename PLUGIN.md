@@ -24,7 +24,7 @@ Two supported layouts:
 The script:
 
 1. links this repository to `<profile>/plugins/model-switch-notify`
-   (an existing real directory is moved to `model-switch-notify.bak.<ts>`),
+   (an existing real directory is moved to `<profile>/plugin-backups/`),
 2. links `skill/` to `<profile>/skills/devops/model-switch-notify`,
 3. enables the plugin in the profile config,
 4. prints the verification commands.
@@ -144,6 +144,7 @@ api_request_error(status_code, reason, retryable, …)
 | --- | --- | --- |
 | No messages at all | Plugin not loaded in the gateway | `hermes -p <name> plugins info model-switch-notify`; reload or `/restart` |
 | Code changes have no effect | A stale `__pycache__` next to the plugin | `rm -rf <plugin>/__pycache__`, then reload |
+| `plugins info` shows an older version | A `plugins/*.bak.*` copy shadows the symlink (same manifest name, last one wins) | Move the backup to `<profile>/plugin-backups/`, then reload |
 | `HTTP 400 … invalid receive_id` | Sending to a session id instead of a chat id | Check `sessions.source`; use a Feishu session or `MODEL_WATCH_FORCE_CHAT` |
 | Nothing on CLI runs | By design: `platform=cli` has no Feishu target | Test from a Feishu chat |
 | Duplicate notices at turn end | Hermes' built-in fallback notice still fires | Set `suppress_warning_notifications: true` for feishu in display config, or ignore |

@@ -20,6 +20,11 @@ All notable changes to this project are documented here. Headings are dates
   `-p <name>` so they operate on the profile that was installed.
 - Setup may run from an installed plugin directory as well as from the
   repository checkout.
+- Replacing a real plugin directory now moves the old copy to
+  `<profile>/plugin-backups/` instead of `plugins/*.bak.*`: Hermes scans every
+  directory under `plugins/`, and a sibling backup with the same manifest name
+  silently won discovery (the gateway kept loading the stale copy). Existing
+  in-tree backups are reported, never deleted.
 - New `tests/test_installer.py` covers root vs profile-scoped homes, explicit
   `--profile` precedence and the installed-directory layout.
 
