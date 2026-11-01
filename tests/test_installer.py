@@ -81,6 +81,22 @@ def test_root_home_without_profile_targets_default(tmp_path, hermes_stub):
     assert result.returncode == 0, result.stderr
     assert (root / "plugins" / "model-switch-notify").is_symlink()
     assert "-p default plugins enable model-switch-notify" in log.read_text()
+    assert f"HERMES_HOME={root} hermes -p default plugins info model-switch-notify" in result.stdout
+
+
+def test_summary_prints_the_selected_home_and_profile(tmp_path, hermes_stub):
+    """A --hermes-home install must print a check command that targets that home."""
+    bin_dir, _log = hermes_stub
+    root = tmp_path / "hermes"
+    (root / "profiles" / "coder").mkdir(parents=True)
+
+    result = _run(bin_dir, root, "--profile", "coder")
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        f"HERMES_HOME={root} hermes -p coder plugins info model-switch-notify"
+        in result.stdout
+    )
 
 
 def test_explicit_profile_wins_over_profile_scoped_home(tmp_path, hermes_stub):

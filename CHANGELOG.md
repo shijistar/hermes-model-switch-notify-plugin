@@ -17,7 +17,8 @@ All notable changes to this project are documented here. Headings are dates
   gateway: it keeps the home it was started with and must be restarted with the
   selected home to load the plugin.
 - Verification, reload, troubleshooting and uninstall commands carry
-  `-p <name>` so they operate on the profile that was installed.
+  `-p <name>` so they operate on the profile that was installed, and the
+  installer's printed check command carries the selected `HERMES_HOME`.
 - Setup may run from an installed plugin directory as well as from the
   repository checkout.
 - Replacing a real plugin directory now moves the old copy to

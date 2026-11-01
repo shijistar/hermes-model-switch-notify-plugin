@@ -20,8 +20,8 @@ plugin reads.
 
 Choosing a home only decides where the files land; it does not move a gateway
 that is already running. A gateway loads plugins from the home it was started
-with, so when you install into a non-default home, restart the gateway with the
-same `HERMES_HOME` (or `--profile <name>`) or it will not see the plugin.
+with, so when you install into a custom root, restart it with the same
+`HERMES_HOME`; for a named profile, also pass `-p <name>`.
 
 What it does:
 
@@ -34,8 +34,9 @@ What it does:
 
 Then confirm the profile `.env` carries `FEISHU_APP_ID` and `FEISHU_APP_SECRET`
 (`FEISHU_DOMAIN=lark` for Lark tenants), check
-`hermes -p <name> plugins info model-switch-notify` (drop `-p <name>` for the
-default profile), and restart the gateway (`/restart`) if hooks were wired by
-an older build.
+`hermes -p <name> plugins info model-switch-notify` (`-p default` for the
+default profile; prefix `HERMES_HOME=<hermes-home>` when the install used a
+custom root), and restart the gateway (`/restart`) if hooks were wired by an
+older build.
 
 Verify the install with `python3 -m pytest tests/ -q`.

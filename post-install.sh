@@ -170,6 +170,7 @@ printf '  Plugin:  %s\n' "$PLUGIN_DIR"
 printf '  Skill:   %s\n' "$SKILL_LINK"
 printf '\033[1;32m\nNext steps:\033[0m\n'
 printf '  1. Run the tests:   python3 -m pytest tests/ -q\n'
-printf '  2. Check the plugin: hermes %s plugins info model-switch-notify\n' "${profile_args[*]}"
+printf -v hermes_home_q '%q' "$HERMES_ROOT"
+printf '  2. Check the plugin: HERMES_HOME=%s hermes %s plugins info model-switch-notify\n' "$hermes_home_q" "${profile_args[*]}"
 printf '  3. Ensure the profile .env has FEISHU_APP_ID / FEISHU_APP_SECRET.\n'
 printf '  4. If hooks were wired by an older build, restart the gateway (/restart).\n'

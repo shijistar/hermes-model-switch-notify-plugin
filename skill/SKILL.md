@@ -32,9 +32,10 @@ hermes -p <name> plugins info model-switch-notify    # Status: enabled
 `--hermes-home DIR` and an exported `HERMES_HOME` are honored, either as the
 Hermes root or as a profile-scoped home (`<root>/profiles/<name>`), so the
 install lands in the same home the plugin reads at runtime. A running gateway
-keeps the home it was started with — restart it with the same home (or
-`--profile <name>`) after installing elsewhere. Drop `-p <name>` for the
-default profile.
+keeps the home it was started with: restart it with the same `HERMES_HOME`
+(custom root) and `-p <name>` (named profile) after installing elsewhere. Use
+`-p default` for the default profile, and prefix
+`HERMES_HOME=<hermes-home>` when the install used a custom root.
 
 The profile `.env` must carry `FEISHU_APP_ID` and `FEISHU_APP_SECRET`
 (`FEISHU_DOMAIN=lark` for Lark tenants). The bot must already be in the target

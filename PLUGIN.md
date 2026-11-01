@@ -40,10 +40,14 @@ hermes plugins install shijistar/hermes-model-switch-notify-plugin --enable
 `--hermes-home` (or an exported `HERMES_HOME`) accepts either the Hermes root
 or a profile-scoped home (`<root>/profiles/<name>`); a profile-scoped home also
 names the profile that gets enabled. It only chooses where the files land — a
-gateway that is already running keeps loading the home it was started with, so
-restart it with the same home (or `-p <name>`) after installing elsewhere.
+gateway that is already running keeps the home it was started with, so restart
+it with the same `HERMES_HOME` (custom root) and `-p <name>` (named profile)
+after installing elsewhere.
 
-Verify (add `-p <name>` when the target is not the default profile):
+When the install used a custom root, prefix every Hermes command below with
+`HERMES_HOME=<hermes-home>`.
+
+Verify (use `-p default` for the default profile):
 
 ```bash
 hermes -p <name> plugins info model-switch-notify     # Status: enabled

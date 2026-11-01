@@ -39,7 +39,8 @@ the per-call hooks and reports each event as it happens.
 # the --install-plugin and --hermes-home variants.
 ./post-install.sh --profile <name>
 
-# Verify registration (drop -p <name> for the default profile)
+# Verify registration (use -p default for the default profile; prefix
+# HERMES_HOME=<hermes-home> when you installed into a custom root)
 hermes -p <name> plugins info model-switch-notify
 
 # Run the test suite
