@@ -82,9 +82,13 @@ SKILL_LINK="$PROFILE_DIR/skills/devops/model-switch-notify"
 
 # The selected profile must apply to *every* Hermes command below, including
 # `plugins install` (it defaults to the currently active profile otherwise).
+# With no --profile the links land in the default profile, so its commands
+# must target it explicitly instead of whatever profile happens to be active.
 profile_args=()
 if [[ -n "$PROFILE_NAME" ]]; then
   profile_args=(-p "$PROFILE_NAME")
+else
+  profile_args=(-p default)
 fi
 
 info "HERMES_HOME = $HERMES_HOME"
