@@ -393,9 +393,12 @@ class FeishuClient:
             except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
                 logger.warning("model-switch-notify: send failed (attempt %s): %s", attempt, exc)
                 # A timeout may mean Feishu already accepted the message: resending
-                # would duplicate it (Lark has no idempotency key for sends).
+                # would duplicate it (Lark has no idempotency key for sends). An
+                # unparsable body means the server answered too (a proxy can return
+                # 200 with a non-JSON page), so it is equally final.
                 timed_out = isinstance(getattr(exc, "reason", exc), TimeoutError)
-                if attempt == 1 and not timed_out:
+                unparsable_body = isinstance(exc, ValueError)
+                if attempt == 1 and not timed_out and not unparsable_body:
                     continue  # connection-level failure: one retry
                 return None
         return None

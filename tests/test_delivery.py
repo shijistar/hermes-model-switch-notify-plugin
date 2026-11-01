@@ -78,6 +78,13 @@ class _Response:
         return False
 
 
+class _RawResponse(_Response):
+    """A 2xx answer with a body that is not JSON (proxy interstitial, HTML error page)."""
+
+    def __init__(self, body: bytes):
+        self._body = body
+
+
 @pytest.fixture
 def feishu(monkeypatch):
     monkeypatch.setattr(
@@ -201,6 +208,22 @@ def test_timeout_is_not_retried(feishu, monkeypatch):
             return _Response({"code": 0, "tenant_access_token": "tok-1", "expire": 7200})
         sends["n"] += 1
         raise urllib.error.URLError(TimeoutError("read timed out"))
+
+    monkeypatch.setattr(msn.urllib.request, "urlopen", urlopen)
+
+    assert feishu.send_text("oc_abc", "hello") is None
+    assert sends["n"] == 1
+
+
+def test_unparsable_response_is_not_retried(feishu, monkeypatch):
+    """A 2xx with a non-JSON body means the server answered; a resend may duplicate."""
+    sends = {"n": 0}
+
+    def urlopen(req, timeout=None):
+        if "tenant_access_token" in req.full_url:
+            return _Response({"code": 0, "tenant_access_token": "tok-1", "expire": 7200})
+        sends["n"] += 1
+        return _RawResponse(b"<html>proxy error</html>")
 
     monkeypatch.setattr(msn.urllib.request, "urlopen", urlopen)
 

@@ -10,7 +10,7 @@ chat in real time.
 | Path        | What it is                                                    | Key files                                |
 | ----------- | ------------------------------------------------------------- | ---------------------------------------- |
 | repo root   | Hermes plugin package: hook handlers, state machine, Feishu client | `__init__.py`, `model_switch_notify.py`, `plugin.yaml` |
-| `tests/`    | Pytest suites (state machine, delivery, registration, profile detection) | `conftest.py`, `test_state_machine.py`, `test_delivery.py`, `test_plugin.py` |
+| `tests/`    | Pytest suites (state machine, delivery, registration, profile detection, installer) | `conftest.py`, `test_state_machine.py`, `test_delivery.py`, `test_plugin.py`, `test_installer.py` |
 | `skill/`    | Hermes agent skill for installing and operating the plugin    | `SKILL.md`, `README.md`                  |
 
 The repository root **is** the plugin package: `plugin.yaml` and `__init__.py`
@@ -58,9 +58,9 @@ The project tracks module versions in **two** places. The CHANGELOG uses
 
 | Place           | Field                    | Current   |
 | --------------- | ------------------------ | --------- |
-| `plugin.yaml`   | `version`                | 0.1.0     |
-| `skill/SKILL.md`| frontmatter `version`    | 1.0.0     |
-| `CHANGELOG.md`  | `## YYYY-MM-DD` headings | 2026-10-31 |
+| `plugin.yaml`   | `version`                | 0.1.1     |
+| `skill/SKILL.md`| frontmatter `version`    | 1.0.1     |
+| `CHANGELOG.md`  | `## YYYY-MM-DD` headings | 2026-11-01 |
 
 Module versions are independent of each other and of the CHANGELOG.
 
@@ -71,8 +71,8 @@ Every module version bump MUST also create a tag of the form
 
 | Module | Tag prefix | Example         |
 | ------ | ---------- | --------------- |
-| plugin | `plugin@`  | `plugin@0.1.0`  |
-| skill  | `skill@`   | `skill@1.0.0`   |
+| plugin | `plugin@`  | `plugin@0.1.1`  |
+| skill  | `skill@`   | `skill@1.0.1`   |
 
 - Tag only the modules whose version actually changed.
 - Tags are created on `master` **after** the PR is merged, never on the feature
@@ -90,6 +90,8 @@ Every new feature or bug fix ships with tests covering the changed behaviour:
 - State transitions and message composition → `tests/test_state_machine.py`
 - Chat resolution, token handling, HTTP failures → `tests/test_delivery.py`
 - Manifest, registration, profile detection, formatting → `tests/test_plugin.py`
+- Installer home/profile resolution → `tests/test_installer.py` (runs
+  `post-install.sh` against a stub `hermes`; no network)
 
 Do not merge a change whose tests fail locally.
 
