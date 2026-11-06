@@ -46,7 +46,7 @@ A new enable hot-reloads plugin hooks. When replacing code, delete
 
 ## Behaviour
 
-Copy is localized (`en` by default, plus `zh-CN` and `zh-TW`); the table
+Copy is localized (`en` by default, plus `zh-CN`, `zh-TW` and `zh-HK`); the table
 shows the English text.
 
 | Event                          | Message                                                    |
@@ -76,7 +76,7 @@ dry_run = false
 rate_per_min = 10
 error_hold_seconds = 8.0
 force_chat = ""
-language = "en"      # en | zh-CN | zh-TW | auto
+language = "en"      # en | zh-CN | zh-TW | zh-HK | auto
 ```
 
 Environment variables override the file (useful for one-off debugging):
@@ -88,7 +88,7 @@ Environment variables override the file (useful for one-off debugging):
 | `rate_per_min`       | `MODEL_WATCH_RATE_PER_MIN`       | `10`    | Per-session per-minute budget                                     |
 | `error_hold_seconds` | `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8.0`   | Merge window before a lone error is sent                          |
 | `force_chat`         | `MODEL_WATCH_FORCE_CHAT`         | empty   | Force a chat id (`oc_…`); bypasses platform gating — testing only |
-| `language`           | `MODEL_WATCH_LANGUAGE`           | `en`    | Notice copy: `en`, `zh-CN`, `zh-TW` or `auto`                     |
+| `language`           | `MODEL_WATCH_LANGUAGE`           | `en`    | Notice copy: `en`, `zh-CN`, `zh-TW`, `zh-HK` or `auto`            |
 
 `auto` follows the profile `ui.language`, then `LC_ALL`/`LC_MESSAGES`/`LANG`,
 then English. An unknown language falls back to `en`; a missing, unreadable or

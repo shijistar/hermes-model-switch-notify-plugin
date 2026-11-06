@@ -15,6 +15,6 @@ error_hold_seconds = 8.0
 # Leave empty to notify the chat the session runs in.
 force_chat = ""
 
-# Notice language: en | zh-CN | zh-TW | auto
+# Notice language: en | zh-CN | zh-TW | zh-HK | auto
 #   auto = follow the Hermes profile ui.language, then LANG, then en
 language = "en"

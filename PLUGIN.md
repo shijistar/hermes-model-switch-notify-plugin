@@ -66,14 +66,14 @@ Settings live in `config.toml` beside the plugin (created from
 `config.example.toml` on install; gitignored). Environment variables override
 the file, which is handy for one-off debugging.
 
-| Setting              | Env override                     | Default | Behaviour                                                                     |
-| -------------------- | -------------------------------- | ------- | ----------------------------------------------------------------------------- |
-| `enabled`            | `MODEL_WATCH_ENABLED`            | `true`  | `false` disables both hooks                                                   |
-| `dry_run`            | `MODEL_WATCH_DRY_RUN`            | `false` | Log `would send` lines instead of calling Feishu                              |
-| `rate_per_min`       | `MODEL_WATCH_RATE_PER_MIN`       | `10`    | Per-session sends per 60s; overflow is counted                                |
-| `error_hold_seconds` | `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8.0`   | How long an error waits for a switch before it is reported alone              |
-| `force_chat`         | `MODEL_WATCH_FORCE_CHAT`         | empty   | Force a chat id (`oc_…`) for testing; bypasses platform gating — testing only |
-| `language`           | `MODEL_WATCH_LANGUAGE`           | `en`    | `en`, `zh-CN`, `zh-TW`, or `auto` (profile `ui.language` → `LANG` → `en`)     |
+| Setting              | Env override                     | Default | Behaviour                                                                          |
+| -------------------- | -------------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| `enabled`            | `MODEL_WATCH_ENABLED`            | `true`  | `false` disables both hooks                                                        |
+| `dry_run`            | `MODEL_WATCH_DRY_RUN`            | `false` | Log `would send` lines instead of calling Feishu                                   |
+| `rate_per_min`       | `MODEL_WATCH_RATE_PER_MIN`       | `10`    | Per-session sends per 60s; overflow is counted                                     |
+| `error_hold_seconds` | `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8.0`   | How long an error waits for a switch before it is reported alone                   |
+| `force_chat`         | `MODEL_WATCH_FORCE_CHAT`         | empty   | Force a chat id (`oc_…`) for testing; bypasses platform gating — testing only      |
+| `language`           | `MODEL_WATCH_LANGUAGE`           | `en`    | `en`, `zh-CN`, `zh-TW`, `zh-HK`, or `auto` (profile `ui.language` → `LANG` → `en`) |
 
 A missing, unreadable or malformed `config.toml` falls back to these defaults
 with a warning; hook callbacks never raise because of configuration.
@@ -91,7 +91,7 @@ A route counts as "primary" when the model matches after stripping any
 
 ## Message contracts
 
-Copy is localized (`en` by default, plus `zh-CN` and `zh-TW`); the messages
+Copy is localized (`en` by default, plus `zh-CN`, `zh-TW` and `zh-HK`); the messages
 below are the English text.
 
 | Event           | Trigger                                                                   | Message                                                                                       |

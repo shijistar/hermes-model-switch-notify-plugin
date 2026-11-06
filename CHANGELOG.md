@@ -8,8 +8,11 @@ All notable changes to this project are documented here. Headings are dates
 ### 0.2.0 — localization and config.toml
 
 - Notice copy is localized into English, Simplified Chinese and Traditional
-  Chinese (18 message keys in `locales/*.json`). English is the default; set
-  `[notify] language` to `zh-CN`, `zh-TW` or `auto`.
+  Chinese in both Taiwan and Hong Kong variants (18 message keys in
+  `locales/*.json`). English is the default; set `[notify] language` to
+  `zh-CN`, `zh-TW`, `zh-HK` or `auto`. The Taiwan and Hong Kong files keep
+  local vocabulary (呼叫/通話, 本輪/本次) rather than a mechanical script
+  conversion, and `zh-HK` falls back through `zh-TW`.
 - `auto` follows the profile `ui.language`, then `LC_ALL`/`LC_MESSAGES`/`LANG`,
   then English. Unknown languages and missing keys fall back through
   `zh-TW -> zh-CN -> en`.

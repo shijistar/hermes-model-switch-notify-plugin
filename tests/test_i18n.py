@@ -23,9 +23,9 @@ def test_locale_files_share_the_same_keys():
     """A missing translation is caught here, not in production."""
     sets = {
         code: set(json.loads((LOCALES / f"{code}.json").read_text(encoding="utf-8")))
-        for code in ("en", "zh-CN", "zh-TW")
+        for code in ("en", "zh-CN", "zh-TW", "zh-HK")
     }
-    assert sets["en"] == sets["zh-CN"] == sets["zh-TW"]
+    assert sets["en"] == sets["zh-CN"] == sets["zh-TW"] == sets["zh-HK"]
 
 
 @pytest.mark.parametrize(
@@ -34,6 +34,7 @@ def test_locale_files_share_the_same_keys():
         ("en", "⚠️ Model switched"),
         ("zh-CN", "⚠️ 模型已切换"),
         ("zh-TW", "⚠️ 模型已切換"),
+        ("zh-HK", "⚠️ 模型已切換"),
     ],
 )
 def test_switch_message_is_localized(monkeypatch, language, expected_title):
@@ -135,3 +136,36 @@ def test_timeout_detail_is_localized(monkeypatch):
 def test_timeout_without_duration_degrades(monkeypatch):
     _set_language(monkeypatch, "en")
     assert msn._reason_text({"reason": "timeout", "count": 1}) == "timeout"
+
+
+def test_hong_kong_copy_uses_local_vocabulary(monkeypatch):
+    """zh-HK says 通話/本次 where zh-TW says 呼叫/本輪."""
+    _set_language(monkeypatch, "zh-TW")
+    tw = msn._error_message(("m", "p"), {"reason": "x"}, is_primary=True)
+    assert "呼叫失敗" in tw
+    assert "通話" not in tw
+
+    _set_language(monkeypatch, "zh-HK")
+    hk = msn._error_message(("m", "p"), {"reason": "x"}, is_primary=True)
+    assert "通話失敗" in hk
+    assert "呼叫" not in hk
+
+    _set_language(monkeypatch, "zh-TW")
+    assert "本輪" in msn._error_message(("m", "p"), {"reason": "x"})
+    _set_language(monkeypatch, "zh-HK")
+    assert "本次" in msn._error_message(("m", "p"), {"reason": "x"})
+
+
+def test_auto_detects_hong_kong_locale(monkeypatch, tmp_path):
+    monkeypatch.setattr(msn, "profile_home", lambda: tmp_path)
+    monkeypatch.setenv("LANG", "zh_HK.UTF-8")
+    monkeypatch.delenv("LC_ALL", raising=False)
+    monkeypatch.delenv("LC_MESSAGES", raising=False)
+    _set_language(monkeypatch, "auto")
+    assert msn._language() == "zh-HK"
+
+
+def test_hong_kong_falls_back_to_taiwan(monkeypatch):
+    _set_language(monkeypatch, "zh-HK")
+    msn._locale("zh-HK").pop("switch.title", None)
+    assert msn._t("switch.title") == "⚠️ 模型已切換"

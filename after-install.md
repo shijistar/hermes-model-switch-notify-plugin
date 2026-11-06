@@ -31,7 +31,7 @@ What it does:
 2. Links `skill/` into the profile's `skills/devops/`.
 3. Creates `config.toml` next to the plugin from `config.example.toml` when it
    is absent; an existing file is kept untouched. Review `[notify]` there —
-   `language` defaults to `en`, and `zh-CN`/`zh-TW`/`auto` are also available.
+   `language` defaults to `en`, and `zh-CN`/`zh-TW`/`zh-HK`/`auto` are also available.
 4. Enables the plugin in the profile config, passing `-p <name>` to every
    Hermes command it runs.
 

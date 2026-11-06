@@ -13,7 +13,7 @@
   "recovery.title": "🟢 已切回主模型",
   "reason.retries": "連續 {count} 次失敗",
   "reason.failed": "呼叫失敗",
-  "suppressed": "（期間另有 {count} 則通知被限流省略）",
+  "suppressed": "（期間另有 {count} 則通知因限流略過）",
   "route.with_provider": "{model}（{provider}）",
   "timeout_detail": "{reason}（已等待 {duration}s；watchdog {threshold}s）",
   "timeout_detail_no_threshold": "{reason}（已等待 {duration}s）"

@@ -48,7 +48,7 @@ _PLUGIN_ROOT = Path(__file__).resolve().parent
 _CONFIG_PATH = _PLUGIN_ROOT / "config.toml"
 _LOCALES_DIR = _PLUGIN_ROOT / "locales"
 _DEFAULT_LANGUAGE = "en"
-_SUPPORTED_LANGUAGES = ("en", "zh-CN", "zh-TW")
+_SUPPORTED_LANGUAGES = ("en", "zh-CN", "zh-TW", "zh-HK")
 
 _RATE_WINDOW_SECONDS = 60.0
 _DEDUPE_SECONDS = 60.0
@@ -608,7 +608,9 @@ def _language_from_locale(raw: str) -> str | None:
     if not value:
         return None
     if value.startswith("zh"):
-        if any(tag in value for tag in ("tw", "hk", "mo", "hant")):
+        if "hk" in value or "mo" in value:
+            return "zh-HK"
+        if "tw" in value or "hant" in value:
             return "zh-TW"
         return "zh-CN"
     if value.startswith("en"):
@@ -661,7 +663,9 @@ def _normalize_language(value: Any) -> str:
         return "en"
     if raw in {"zh", "zh-cn", "zh-hans", "zh-sg", "zh-my"}:
         return "zh-CN"
-    if raw in {"zh-tw", "zh-hk", "zh-mo", "zh-hant"}:
+    if raw in {"zh-hk", "zh-mo"}:
+        return "zh-HK"
+    if raw in {"zh-tw", "zh-hant"}:
         return "zh-TW"
     logger.warning("model-switch-notify: unsupported language %r; using %s", value, _DEFAULT_LANGUAGE)
     return _DEFAULT_LANGUAGE
@@ -692,6 +696,8 @@ def reset_locale_cache() -> None:
 
 
 def _fallback_chain(language: str) -> tuple[str, ...]:
+    if language == "zh-HK":
+        return ("zh-HK", "zh-TW", "zh-CN", "en")
     if language == "zh-TW":
         return ("zh-TW", "zh-CN", "en")
     if language == "zh-CN":

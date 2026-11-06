@@ -57,7 +57,7 @@ with that same home.
 
 ## What the user sees
 
-Copy is localized (`en` by default, plus `zh-CN` and `zh-TW`; see
+Copy is localized (`en` by default, plus `zh-CN`, `zh-TW` and `zh-HK`; see
 [Configuration](#configuration)). The English text:
 
 ```
@@ -95,7 +95,7 @@ dry_run = false
 rate_per_min = 10
 error_hold_seconds = 8.0
 force_chat = ""
-language = "en"      # en | zh-CN | zh-TW | auto
+language = "en"      # en | zh-CN | zh-TW | zh-HK | auto
 ```
 
 | Setting              | Env override                     | Default | Purpose                                                                       |
@@ -105,7 +105,7 @@ language = "en"      # en | zh-CN | zh-TW | auto
 | `rate_per_min`       | `MODEL_WATCH_RATE_PER_MIN`       | `10`    | Per-session send budget                                                       |
 | `error_hold_seconds` | `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8.0`   | Merge window for "error → switch"                                             |
 | `force_chat`         | `MODEL_WATCH_FORCE_CHAT`         | empty   | Force a chat id (`oc_…`) for testing; bypasses platform gating — testing only |
-| `language`           | `MODEL_WATCH_LANGUAGE`           | `en`    | Notice copy: `en`, `zh-CN`, `zh-TW`, `auto`                                   |
+| `language`           | `MODEL_WATCH_LANGUAGE`           | `en`    | Notice copy: `en`, `zh-CN`, `zh-TW`, `zh-HK`, `auto`                          |
 
 `auto` follows the profile `ui.language`, then `LC_ALL`/`LC_MESSAGES`/`LANG`,
 then English. An unknown language and a missing, unreadable or malformed
