@@ -7,11 +7,12 @@ chat in real time.
 
 ## Modules
 
-| Path        | What it is                                                    | Key files                                |
-| ----------- | ------------------------------------------------------------- | ---------------------------------------- |
-| repo root   | Hermes plugin package: hook handlers, state machine, Feishu client | `__init__.py`, `model_switch_notify.py`, `plugin.yaml` |
-| `tests/`    | Pytest suites (state machine, delivery, registration, profile detection, installer) | `conftest.py`, `test_state_machine.py`, `test_delivery.py`, `test_plugin.py`, `test_installer.py` |
-| `skill/`    | Hermes agent skill for installing and operating the plugin    | `SKILL.md`, `README.md`                  |
+| Path       | What it is                                                                                        | Key files                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| repo root  | Hermes plugin package: hook handlers, state machine, Feishu client                                | `__init__.py`, `model_switch_notify.py`, `plugin.yaml`, `config.example.toml`                                                       |
+| `locales/` | Notice copy: `en`, `zh-CN`, `zh-TW`, `zh-HK` (flat JSON, identical key sets)                      | `en.json`, `zh-CN.json`, `zh-TW.json`, `zh-HK.json`                                                                                 |
+| `tests/`   | Pytest suites (state machine, delivery, registration, profile detection, installer, i18n, config) | `conftest.py`, `test_state_machine.py`, `test_delivery.py`, `test_plugin.py`, `test_installer.py`, `test_i18n.py`, `test_config.py` |
+| `skill/`   | Hermes agent skill for installing and operating the plugin                                        | `SKILL.md`, `README.md`                                                                                                             |
 
 The repository root **is** the plugin package: `plugin.yaml` and `__init__.py`
 live at the top level, and `hermes plugins install` clones the whole repository.
@@ -27,10 +28,13 @@ hermes-model-switch-notify-plugin/
 ├── __init__.py               # Hermes entry point: register(ctx)
 ├── model_switch_notify.py    # Implementation
 ├── plugin.yaml               # Plugin metadata + version
-├── post-install.sh           # Symlink installer (plugin + skill)
+├── config.example.toml       # Tracked template for the local config
+├── config.toml               # Local settings (gitignored, created by the installer)
+├── post-install.sh           # Symlink installer (plugin + skill + config bootstrap)
 ├── after-install.md          # Follow-up steps shown by `hermes plugins install`
-├── requirements.txt          # Runtime dependencies (stdlib only)
+├── requirements.txt          # Runtime dependencies (PyYAML)
 ├── requirements-dev.txt      # Test dependencies
+├── locales/                  # Notice copy: en, zh-CN, zh-TW, zh-HK
 ├── tests/                    # pytest suites
 └── skill/                    # Hermes agent skill
     ├── SKILL.md
@@ -56,11 +60,11 @@ python3 -m pytest tests/ -v     # per-test detail
 The project tracks module versions in **two** places. The CHANGELOG uses
 **date headings** (`## YYYY-MM-DD`), not version numbers:
 
-| Place           | Field                    | Current   |
-| --------------- | ------------------------ | --------- |
-| `plugin.yaml`   | `version`                | 0.1.1     |
-| `skill/SKILL.md`| frontmatter `version`    | 1.0.1     |
-| `CHANGELOG.md`  | `## YYYY-MM-DD` headings | 2026-11-01 |
+| Place            | Field                    | Current    |
+| ---------------- | ------------------------ | ---------- |
+| `plugin.yaml`    | `version`                | 0.1.1      |
+| `skill/SKILL.md` | frontmatter `version`    | 1.0.1      |
+| `CHANGELOG.md`   | `## YYYY-MM-DD` headings | 2026-11-01 |
 
 Module versions are independent of each other and of the CHANGELOG.
 
@@ -69,10 +73,10 @@ Module versions are independent of each other and of the CHANGELOG.
 Every module version bump MUST also create a tag of the form
 `<type>@<version>` on the merge commit in `master`:
 
-| Module | Tag prefix | Example         |
-| ------ | ---------- | --------------- |
-| plugin | `plugin@`  | `plugin@0.1.1`  |
-| skill  | `skill@`   | `skill@1.0.1`   |
+| Module | Tag prefix | Example        |
+| ------ | ---------- | -------------- |
+| plugin | `plugin@`  | `plugin@0.1.1` |
+| skill  | `skill@`   | `skill@1.0.1`  |
 
 - Tag only the modules whose version actually changed.
 - Tags are created on `master` **after** the PR is merged, never on the feature
@@ -92,6 +96,8 @@ Every new feature or bug fix ships with tests covering the changed behaviour:
 - Manifest, registration, profile detection, formatting → `tests/test_plugin.py`
 - Installer home/profile resolution → `tests/test_installer.py` (runs
   `post-install.sh` against a stub `hermes`; no network)
+- Locale files, language resolution and fallback chains → `tests/test_i18n.py`
+- config.toml loading, env overrides and invalid input → `tests/test_config.py`
 
 Do not merge a change whose tests fail locally.
 
@@ -107,8 +113,10 @@ user-visible.
 ### 3. Language
 
 Documentation, code comments, docstrings, commit messages and PR text are
-written in **English**. The exception is user-facing message literals sent to
-Feishu (Chinese), which are product strings and must stay as-is.
+written in **English**. User-facing notice copy lives in `locales/*.json`
+(`en.json`, `zh-CN.json`, `zh-TW.json`, `zh-HK.json`) and is not a source-language exception:
+when a message key changes, update all three files together — the i18n test
+asserts that their key sets match.
 
 ## Git workflow
 

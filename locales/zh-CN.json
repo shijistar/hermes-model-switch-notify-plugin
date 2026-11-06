@@ -1,0 +1,20 @@
+{
+  "switch.title": "⚠️ 模型已切换",
+  "switch.reason": "原因：{reason}",
+  "switch.from": "原模型：{route}",
+  "switch.to": "现模型：{route}",
+  "time": "时间：{time}",
+  "error.title_primary": "🔴 主模型调用失败",
+  "error.title_current": "🔴 当前模型调用失败",
+  "error.model": "模型：{route}",
+  "error.detail": "错误：{reason}",
+  "error.recovered": "✅ 已自动重试成功",
+  "error.retrying": "本轮继续重试，若持续失败会自动切换模型",
+  "recovery.title": "🟢 已切回主模型",
+  "reason.retries": "连续 {count} 次失败",
+  "reason.failed": "调用失败",
+  "suppressed": "（期间另有 {count} 条通知被限流省略）",
+  "route.with_provider": "{model}（{provider}）",
+  "timeout_detail": "{reason}（已等待 {duration}s；watchdog {threshold}s）",
+  "timeout_detail_no_threshold": "{reason}（已等待 {duration}s）"
+}

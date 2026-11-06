@@ -57,37 +57,59 @@ with that same home.
 
 ## What the user sees
 
+Copy is localized (`en` by default, plus `zh-CN`, `zh-TW` and `zh-HK`; see
+[Configuration](#configuration)). The English text:
+
 ```
-⚠️ 模型已切换
-原因：HTTP 429 · rate_limit · 连续 2 次失败
-原模型：deepseek-v4.1-flash（opencode-go）
-现模型：stepfun/step-3.7-flash:free（nous）
-时间：2026-10-31 19:20:03
+⚠️ Model switched
+Reason: HTTP 429 · rate_limit · 2 consecutive failures
+From: deepseek-v4.1-flash (opencode-go)
+To: stepfun/step-3.7-flash:free (nous)
+Time: 2026-10-31 19:20:03
 ```
 
 ```
-🔴 主模型调用失败
-模型：deepseek-v4.1-flash（opencode-go）
-错误：HTTP 500 · server_error · 已自动重试成功
+🔴 Primary model call failed
+Model: deepseek-v4.1-flash (opencode-go)
+Error: HTTP 500 · server_error · ✅ Retried successfully
 ```
 
 ```
-🟢 已切回主模型
-模型：deepseek-v4.1-flash（opencode-go）
+🟢 Switched back to the primary model
+Model: deepseek-v4.1-flash (opencode-go)
 ```
+
+A timeout also reports the observed wait and the watchdog budget:
+`timeout (waited 180.4s; watchdog 180s)`.
 
 ## Configuration
 
-All settings are environment variables in the profile `.env` (see
-`PLUGIN.md` for the full table):
+Settings live in `config.toml` next to the plugin (created from
+`config.example.toml` on install; not tracked by Git). Environment variables
+override the file. See `PLUGIN.md` for the full table.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `MODEL_WATCH_ENABLED` | `1` | Master switch |
-| `MODEL_WATCH_DRY_RUN` | `0` | Log instead of sending |
-| `MODEL_WATCH_RATE_PER_MIN` | `10` | Per-session send budget |
-| `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8` | Merge window for "error → switch" |
-| `MODEL_WATCH_FORCE_CHAT` | empty | Force a chat id (`oc_…`) for testing; bypasses platform gating — testing only |
+```toml
+[notify]
+enabled = true
+dry_run = false
+rate_per_min = 10
+error_hold_seconds = 8.0
+force_chat = ""
+language = "en"      # en | zh-CN | zh-TW | zh-HK | auto
+```
+
+| Setting              | Env override                     | Default | Purpose                                                                       |
+| -------------------- | -------------------------------- | ------- | ----------------------------------------------------------------------------- |
+| `enabled`            | `MODEL_WATCH_ENABLED`            | `true`  | Master switch                                                                 |
+| `dry_run`            | `MODEL_WATCH_DRY_RUN`            | `false` | Log instead of sending                                                        |
+| `rate_per_min`       | `MODEL_WATCH_RATE_PER_MIN`       | `10`    | Per-session send budget                                                       |
+| `error_hold_seconds` | `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8.0`   | Merge window for "error → switch"                                             |
+| `force_chat`         | `MODEL_WATCH_FORCE_CHAT`         | empty   | Force a chat id (`oc_…`) for testing; bypasses platform gating — testing only |
+| `language`           | `MODEL_WATCH_LANGUAGE`           | `en`    | Notice copy: `en`, `zh-CN`, `zh-TW`, `zh-HK`, `auto`                          |
+
+`auto` follows the profile `ui.language`, then `LC_ALL`/`LC_MESSAGES`/`LANG`,
+then English. An unknown language and a missing, unreadable or malformed
+`config.toml` fall back to the defaults with a warning.
 
 ## Safety
 
@@ -110,10 +132,10 @@ troubleshooting live in `PLUGIN.md`.
 
 ## Documentation map
 
-| File | Contents |
-| --- | --- |
-| `README.md` | Overview, quick start, feature list |
-| `PLUGIN.md` | Install, configuration, message contracts, troubleshooting |
-| `AGENTS.md` | Repository layout, conventions, tests, versioning |
-| `CHANGELOG.md` | Dated release notes |
+| File             | Contents                                                      |
+| ---------------- | ------------------------------------------------------------- |
+| `README.md`      | Overview, quick start, feature list                           |
+| `PLUGIN.md`      | Install, configuration, message contracts, troubleshooting    |
+| `AGENTS.md`      | Repository layout, conventions, tests, versioning             |
+| `CHANGELOG.md`   | Dated release notes                                           |
 | `skill/SKILL.md` | Agent-facing workflow for installing and operating the plugin |

@@ -1,7 +1,7 @@
 ---
 name: model-switch-notify
 description: Install and operate Feishu model-switch alerts.
-version: 1.0.1
+version: 1.1.0
 author: Hermes Agent / Fengbao Li
 metadata:
   hermes:
@@ -46,27 +46,54 @@ A new enable hot-reloads plugin hooks. When replacing code, delete
 
 ## Behaviour
 
-| Event | Message |
-| --- | --- |
-| Route changed | `⚠️ 模型已切换` — cause, old route, new route, time |
-| Primary failed, retried OK | `🔴 主模型调用失败` + `已自动重试成功` |
-| Primary failed, no switch | `🔴 主模型调用失败` after the hold window |
-| Back on the configured primary | `🟢 已切回主模型` |
+Copy is localized (`en` by default, plus `zh-CN`, `zh-TW` and `zh-HK`); the table
+shows the English text.
+
+| Event                          | Message                                                    |
+| ------------------------------ | ---------------------------------------------------------- |
+| Route changed                  | `⚠️ Model switched` — cause, old route, new route, time    |
+| Primary failed, retried OK     | `🔴 Primary model call failed` + `✅ Retried successfully` |
+| Primary failed, no switch      | `🔴 Primary model call failed` after the hold window       |
+| Back on the configured primary | `🟢 Switched back to the primary model`                    |
+
+A timeout carries the observed wait and the watchdog budget, e.g.
+`timeout (waited 180.4s; watchdog 180s)`; the budget comes from
+`providers.<id>.stale_timeout_seconds`, else `HERMES_STREAM_STALE_TIMEOUT`,
+else 180s.
 
 An error arriving before a switch is merged into the switch message. Identical
 switches are de-duplicated for 60s; the marker resets after a recovery.
 
 ## Configure
 
-Profile `.env` variables:
+Settings live in `config.toml` next to the plugin. The installer creates it
+from `config.example.toml` only when absent; it is not tracked by Git.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `MODEL_WATCH_ENABLED` | `1` | Master switch |
-| `MODEL_WATCH_DRY_RUN` | `0` | Log instead of sending |
-| `MODEL_WATCH_RATE_PER_MIN` | `10` | Per-session per-minute budget |
-| `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8` | Merge window before a lone error is sent |
-| `MODEL_WATCH_FORCE_CHAT` | empty | Force a chat id (`oc_…`); bypasses platform gating — testing only |
+```toml
+[notify]
+enabled = true
+dry_run = false
+rate_per_min = 10
+error_hold_seconds = 8.0
+force_chat = ""
+language = "en"      # en | zh-CN | zh-TW | zh-HK | auto
+```
+
+Environment variables override the file (useful for one-off debugging):
+
+| Setting              | Env override                     | Default | Purpose                                                           |
+| -------------------- | -------------------------------- | ------- | ----------------------------------------------------------------- |
+| `enabled`            | `MODEL_WATCH_ENABLED`            | `true`  | Master switch                                                     |
+| `dry_run`            | `MODEL_WATCH_DRY_RUN`            | `false` | Log instead of sending                                            |
+| `rate_per_min`       | `MODEL_WATCH_RATE_PER_MIN`       | `10`    | Per-session per-minute budget                                     |
+| `error_hold_seconds` | `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8.0`   | Merge window before a lone error is sent                          |
+| `force_chat`         | `MODEL_WATCH_FORCE_CHAT`         | empty   | Force a chat id (`oc_…`); bypasses platform gating — testing only |
+| `language`           | `MODEL_WATCH_LANGUAGE`           | `en`    | Notice copy: `en`, `zh-CN`, `zh-TW`, `zh-HK` or `auto`            |
+
+`auto` follows the profile `ui.language`, then `LC_ALL`/`LC_MESSAGES`/`LANG`,
+then English. An unknown language falls back to `en`; a missing, unreadable or
+malformed `config.toml` falls back to the defaults with a warning and never
+raises inside a hook.
 
 "Primary" is `model.default` + `model.provider` from the profile
 `config.yaml`; the model comparison ignores a `provider/` prefix and case.
@@ -93,14 +120,14 @@ check that the chat receives the notice.
 
 ## Troubleshooting
 
-| Symptom | Action |
-| --- | --- |
-| No notification | `hermes -p <name> plugins info`; reload with disable/enable or `/restart` |
-| Edits ignored | `rm -rf <plugin>/__pycache__` — a stale `.pyc` shadows the source |
-| Old version reported | A `plugins/*.bak.*` copy shadows the symlink; move it to `<profile>/plugin-backups/` and reload |
+| Symptom                       | Action                                                                                                           |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| No notification               | `hermes -p <name> plugins info`; reload with disable/enable or `/restart`                                        |
+| Edits ignored                 | `rm -rf <plugin>/__pycache__` — a stale `.pyc` shadows the source                                                |
+| Old version reported          | A `plugins/*.bak.*` copy shadows the symlink; move it to `<profile>/plugin-backups/` and reload                  |
 | `HTTP 400 invalid receive_id` | The target was a session id, not a chat id; only `source=feishu` rows with an `oc_`/`ou_`/`on_` prefix are valid |
-| CLI runs silent | Expected: one-shot sessions have `platform=cli` and no Feishu target |
-| Duplicate end-of-turn notice | Hermes' built-in fallback notice still fires; optionally set `suppress_warning_notifications: true` for feishu |
+| CLI runs silent               | Expected: one-shot sessions have `platform=cli` and no Feishu target                                             |
+| Duplicate end-of-turn notice  | Hermes' built-in fallback notice still fires; optionally set `suppress_warning_notifications: true` for feishu   |
 
 ## Uninstall
 

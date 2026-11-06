@@ -26,11 +26,18 @@ def clean_plugin_state(monkeypatch):
     msn.reset_env_cache()
     msn.reset_primary_cache()
     msn.reset_profile_home_cache()
+    msn.reset_config_cache()
+    msn.reset_locale_cache()
+
+    # Never read a developer's real config.toml; tests set values explicitly.
+    monkeypatch.setattr(msn, "_CONFIG_PATH", ROOT / "tests" / ".no-config.toml")
 
     monkeypatch.setattr(
         msn, "configured_primary", lambda: ("deepseek-v4.1-flash", "opencode-go")
     )
     monkeypatch.setenv("MODEL_WATCH_ERROR_HOLD_SECONDS", "0.15")
+    # Existing tests assert the Chinese copy; language tests override this.
+    monkeypatch.setenv("MODEL_WATCH_LANGUAGE", "zh-CN")
     monkeypatch.delenv("MODEL_WATCH_FORCE_CHAT", raising=False)
     monkeypatch.delenv("MODEL_WATCH_ENABLED", raising=False)
     monkeypatch.delenv("MODEL_WATCH_DRY_RUN", raising=False)
