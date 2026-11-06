@@ -33,6 +33,7 @@ import re
 import sqlite3
 import threading
 import time
+import tomllib
 import urllib.error
 import urllib.request
 from collections import deque
@@ -42,6 +43,12 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _HERMES_HOME = Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+
+_PLUGIN_ROOT = Path(__file__).resolve().parent
+_CONFIG_PATH = _PLUGIN_ROOT / "config.toml"
+_LOCALES_DIR = _PLUGIN_ROOT / "locales"
+_DEFAULT_LANGUAGE = "en"
+_SUPPORTED_LANGUAGES = ("en", "zh-CN", "zh-TW")
 
 _RATE_WINDOW_SECONDS = 60.0
 _DEDUPE_SECONDS = 60.0
@@ -59,30 +66,121 @@ _TOKEN_STALE_CODES = (99991661, 99991663, 99991668)
 # --------------------------------------------------------------------------- #
 
 
+_config_lock = threading.Lock()
+_config_cache: dict[str, Any] | None = None
+
+
+def _load_config_file() -> dict[str, Any]:
+    """Read the ``[notify]`` table from the plugin's local config.toml.
+
+    Hook callbacks run on the API request path, so a missing, unreadable or
+    malformed file degrades to defaults with a warning instead of raising.
+    """
+    if not _CONFIG_PATH.is_file():
+        return {}
+    try:
+        data = tomllib.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 - config must never break the hook
+        logger.warning("model-switch-notify: cannot read %s: %s", _CONFIG_PATH, exc)
+        return {}
+    section = data.get("notify")
+    if not isinstance(section, dict):
+        logger.warning("model-switch-notify: %s has no [notify] table", _CONFIG_PATH)
+        return {}
+    return section
+
+
+def _config() -> dict[str, Any]:
+    global _config_cache
+    with _config_lock:
+        if _config_cache is None:
+            _config_cache = _load_config_file()
+        return _config_cache
+
+
+def reset_config_cache() -> None:
+    """Test hook: re-read config.toml on the next access."""
+    global _config_cache
+    with _config_lock:
+        _config_cache = None
+
+
+def _as_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        raw = value.strip().lower()
+        if raw in {"1", "true", "yes", "on"}:
+            return True
+        if raw in {"0", "false", "no", "off"}:
+            return False
+    return None
+
+
+def _as_int(value: Any, minimum: int = 0) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number >= minimum else None
+
+
+def _as_float(value: Any, minimum: float = 0.0) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number >= minimum else None
+
+
+def _setting(name: str, env_name: str, coerce) -> Any:
+    """An explicit env value wins over config.toml; invalid input falls through."""
+    raw = os.environ.get(env_name)
+    if raw is not None:
+        value = coerce(raw)
+        if value is not None:
+            return value
+        logger.warning("model-switch-notify: ignoring invalid %s=%r", env_name, raw)
+        return None
+    section = _config()
+    if name in section:
+        value = coerce(section[name])
+        if value is not None:
+            return value
+        logger.warning("model-switch-notify: ignoring invalid config value %s=%r", name, section[name])
+    return None
+
+
 def _enabled() -> bool:
-    return os.environ.get("MODEL_WATCH_ENABLED", "1").strip().lower() not in {"0", "false", "no", "off"}
+    value = _setting("enabled", "MODEL_WATCH_ENABLED", _as_bool)
+    return True if value is None else value
 
 
 def _dry_run() -> bool:
-    return os.environ.get("MODEL_WATCH_DRY_RUN", "0").strip().lower() in {"1", "true", "yes", "on"}
+    value = _setting("dry_run", "MODEL_WATCH_DRY_RUN", _as_bool)
+    return False if value is None else value
 
 
 def _rate_limit() -> int:
-    try:
-        return max(1, int(os.environ.get("MODEL_WATCH_RATE_PER_MIN", "10")))
-    except ValueError:
-        return 10
+    value = _setting("rate_per_min", "MODEL_WATCH_RATE_PER_MIN", lambda v: _as_int(v, 1))
+    return 10 if value is None else value
 
 
 def _hold_seconds() -> float:
-    try:
-        return max(0.0, float(os.environ.get("MODEL_WATCH_ERROR_HOLD_SECONDS", _DEFAULT_HOLD_SECONDS)))
-    except ValueError:
-        return _DEFAULT_HOLD_SECONDS
+    value = _setting("error_hold_seconds", "MODEL_WATCH_ERROR_HOLD_SECONDS", lambda v: _as_float(v, 0.0))
+    return _DEFAULT_HOLD_SECONDS if value is None else value
 
 
 def _force_chat() -> str:
-    return os.environ.get("MODEL_WATCH_FORCE_CHAT", "").strip()
+    raw = os.environ.get("MODEL_WATCH_FORCE_CHAT")
+    if raw is None:
+        candidate = _config().get("force_chat", "")
+        raw = candidate if isinstance(candidate, str) else ""
+    return raw.strip()
 
 
 _profile_home_lock = threading.Lock()
@@ -485,8 +583,136 @@ def reset_state() -> None:
         _sessions.clear()
 
 
+# --------------------------------------------------------------------------- #
+# localization
+# --------------------------------------------------------------------------- #
+
+_locale_lock = threading.Lock()
+_locale_cache: dict[str, dict[str, str]] = {}
+
+
+def _config_language() -> str:
+    value = _config().get("language", _DEFAULT_LANGUAGE)
+    return value if isinstance(value, str) and value.strip() else _DEFAULT_LANGUAGE
+
+
+def _language() -> str:
+    raw = os.environ.get("MODEL_WATCH_LANGUAGE")
+    if raw is None:
+        raw = _config_language()
+    return _normalize_language(raw)
+
+
+def _language_from_locale(raw: str) -> str | None:
+    value = raw.split(".")[0].split("@")[0].strip().lower().replace("_", "-")
+    if not value:
+        return None
+    if value.startswith("zh"):
+        if any(tag in value for tag in ("tw", "hk", "mo", "hant")):
+            return "zh-TW"
+        return "zh-CN"
+    if value.startswith("en"):
+        return "en"
+    return None
+
+
+def _ui_language() -> str | None:
+    """The Hermes profile's ``ui.language``, falling back to the global one."""
+    try:
+        import yaml
+
+        home = profile_home()
+        candidates = [home / "config.yaml"]
+        if home.parent.name == "profiles":
+            candidates.append(home.parent.parent / "config.yaml")
+        for path in candidates:
+            if not path.is_file():
+                continue
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            ui = data.get("ui") if isinstance(data, dict) else None
+            language = ui.get("language") if isinstance(ui, dict) else None
+            if isinstance(language, str) and language.strip():
+                resolved = _language_from_locale(language)
+                if resolved:
+                    return resolved
+    except Exception as exc:  # noqa: BLE001 - detection is best-effort
+        logger.debug("model-switch-notify: cannot read ui.language: %s", exc)
+    return None
+
+
+def _detect_language() -> str:
+    detected = _ui_language()
+    if detected:
+        return detected
+    for name in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        raw = os.environ.get(name)
+        if raw:
+            resolved = _language_from_locale(raw)
+            if resolved:
+                return resolved
+    return _DEFAULT_LANGUAGE
+
+
+def _normalize_language(value: Any) -> str:
+    raw = str(value or "").strip().lower().replace("_", "-")
+    if raw == "auto":
+        return _detect_language()
+    if raw in {"en", "en-us", "en-gb", "en-ca", "en-au", "en-nz"}:
+        return "en"
+    if raw in {"zh", "zh-cn", "zh-hans", "zh-sg", "zh-my"}:
+        return "zh-CN"
+    if raw in {"zh-tw", "zh-hk", "zh-mo", "zh-hant"}:
+        return "zh-TW"
+    logger.warning("model-switch-notify: unsupported language %r; using %s", value, _DEFAULT_LANGUAGE)
+    return _DEFAULT_LANGUAGE
+
+
+def _locale(language: str) -> dict[str, str]:
+    with _locale_lock:
+        cached = _locale_cache.get(language)
+        if cached is not None:
+            return cached
+        data: dict[str, str] = {}
+        path = _LOCALES_DIR / f"{language}.json"
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(raw, dict):
+                raise ValueError("locale file must contain a JSON object")
+            data = {str(key): str(value) for key, value in raw.items()}
+        except Exception as exc:  # noqa: BLE001 - fall back through the chain
+            logger.warning("model-switch-notify: cannot load locale %s: %s", language, exc)
+        _locale_cache[language] = data
+        return data
+
+
+def reset_locale_cache() -> None:
+    """Test hook: drop cached locale files."""
+    with _locale_lock:
+        _locale_cache.clear()
+
+
+def _fallback_chain(language: str) -> tuple[str, ...]:
+    if language == "zh-TW":
+        return ("zh-TW", "zh-CN", "en")
+    if language == "zh-CN":
+        return ("zh-CN", "en")
+    return ("en",)
+
+
+def _t(key: str, **kwargs: Any) -> str:
+    for code in _fallback_chain(_language()):
+        template = _locale(code).get(key)
+        if template is None:
+            continue
+        try:
+            return template.format(**kwargs)
+        except (KeyError, IndexError, ValueError) as exc:
+            logger.warning("model-switch-notify: bad placeholder in %s/%s: %s", code, key, exc)
+    return key
+
+
 def _route_label(model: Any, provider: Any) -> str:
-    return f"{model}（{provider}）" if provider else str(model)
+    return _t("route.with_provider", model=model, provider=provider) if provider else str(model)
 
 
 def _allow_send(st: dict[str, Any]) -> bool:
@@ -524,13 +750,63 @@ def _dispatch(session_id: str, st: dict[str, Any], text: str) -> None:
             logger.info("model-switch-notify: rate-limited (%s/min); suppressed=%s", _rate_limit(), cur["suppressed"])
             return
         if cur["suppressed"]:
-            text = f"{text}\n（期间另有 {cur['suppressed']} 条通知被限流省略）"
+            text = f"{text}\n{_t('suppressed', count=cur['suppressed'])}"
             cur["suppressed"] = 0
     _ensure_worker()
     try:
         _outbox.put_nowait((chat_id, text))
     except queue.Full:
         logger.warning("model-switch-notify: outbox full; dropping notice")
+
+
+def _configured_stale_timeout(provider: str, model: str) -> float | None:
+    """``providers.<id>[.models.<model>].stale_timeout_seconds``, if configured."""
+    if not provider:
+        return None
+    try:
+        import yaml
+
+        data = yaml.safe_load((profile_home() / "config.yaml").read_text(encoding="utf-8")) or {}
+    except Exception as exc:  # noqa: BLE001 - display detail only
+        logger.debug("model-switch-notify: cannot read provider timeouts: %s", exc)
+        return None
+    providers = data.get("providers") if isinstance(data, dict) else None
+    section = providers.get(provider) if isinstance(providers, dict) else None
+    if not isinstance(section, dict):
+        return None
+    if model:
+        models = section.get("models")
+        model_config = models.get(model) if isinstance(models, dict) else None
+        if isinstance(model_config, dict):
+            value = _as_float(model_config.get("stale_timeout_seconds"), 0.0)
+            if value is not None:
+                return value
+    return _as_float(section.get("stale_timeout_seconds"), 0.0)
+
+
+def _watchdog_threshold(provider: str, model: str) -> float | None:
+    explicit = _configured_stale_timeout(provider, model)
+    if explicit is not None:
+        return explicit
+    from_env = _as_float(os.environ.get("HERMES_STREAM_STALE_TIMEOUT"), 0.0)
+    return from_env if from_env is not None else 180.0
+
+
+def _timeout_text(text: str, pending: dict[str, Any]) -> str:
+    duration = pending.get("duration")
+    if isinstance(duration, bool) or not isinstance(duration, (int, float)) or duration <= 0:
+        return text
+    threshold = _watchdog_threshold(
+        str(pending.get("provider") or ""), str(pending.get("model") or "")
+    )
+    if threshold is None:
+        return _t("timeout_detail_no_threshold", reason=text, duration=f"{duration:.1f}")
+    return _t(
+        "timeout_detail",
+        reason=text,
+        duration=f"{duration:.1f}",
+        threshold=f"{threshold:g}",
+    )
 
 
 def _reason_text(pending: dict[str, Any]) -> str:
@@ -542,34 +818,37 @@ def _reason_text(pending: dict[str, Any]) -> str:
     if reason:
         parts.append(str(reason))
     if pending.get("count", 1) > 1:
-        parts.append(f"连续 {pending['count']} 次失败")
-    return " · ".join(parts) if parts else "调用失败"
+        parts.append(_t("reason.retries", count=pending["count"]))
+    text = " · ".join(parts) if parts else _t("reason.failed")
+    if str(reason or "").strip().lower() == "timeout":
+        text = _timeout_text(text, pending)
+    return text
 
 
 def _switch_message(from_route, to_route, pending) -> str:
-    lines = ["⚠️ 模型已切换"]
+    lines = [_t("switch.title")]
     if pending:
-        lines.append(f"原因：{_reason_text(pending)}")
-    lines.append(f"原模型：{_route_label(*from_route)}")
-    lines.append(f"现模型：{_route_label(*to_route)}")
-    lines.append(f"时间：{time.strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append(_t("switch.reason", reason=_reason_text(pending)))
+    lines.append(_t("switch.from", route=_route_label(*from_route)))
+    lines.append(_t("switch.to", route=_route_label(*to_route)))
+    lines.append(_t("time", time=time.strftime("%Y-%m-%d %H:%M:%S")))
     return "\n".join(lines)
 
 
 def _error_message(route, pending, is_primary: bool = True, recovered: bool = False) -> str:
-    title = "🔴 主模型调用失败" if is_primary else "🔴 当前模型调用失败"
-    lines = [title, f"模型：{_route_label(*route)}"]
-    lines.append(f"错误：{_reason_text(pending)}")
-    lines.append("✅ 已自动重试成功" if recovered else "本轮继续重试，若持续失败会自动切换模型")
-    lines.append(f"时间：{time.strftime('%Y-%m-%d %H:%M:%S')}")
+    title = _t("error.title_primary" if is_primary else "error.title_current")
+    lines = [title, _t("error.model", route=_route_label(*route))]
+    lines.append(_t("error.detail", reason=_reason_text(pending)))
+    lines.append(_t("error.recovered") if recovered else _t("error.retrying"))
+    lines.append(_t("time", time=time.strftime("%Y-%m-%d %H:%M:%S")))
     return "\n".join(lines)
 
 
 def _recovery_message(route) -> str:
     return "\n".join([
-        "🟢 已切回主模型",
-        f"模型：{_route_label(*route)}",
-        f"时间：{time.strftime('%Y-%m-%d %H:%M:%S')}",
+        _t("recovery.title"),
+        _t("error.model", route=_route_label(*route)),
+        _t("time", time=time.strftime("%Y-%m-%d %H:%M:%S")),
     ])
 
 
@@ -718,6 +997,9 @@ def on_api_request_error(**kwargs: Any) -> None:
             timer.start()
         pending["count"] += 1
         pending["status"] = kwargs.get("status_code")
+        pending["duration"] = kwargs.get("api_duration")
+        pending["provider"] = route[1]
+        pending["model"] = route[0]
         reason = kwargs.get("reason")
         if reason:
             pending["reason"] = re.sub(r"^[A-Za-z_]+\.", "", str(reason))

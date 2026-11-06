@@ -1,0 +1,20 @@
+{
+  "switch.title": "⚠️ Model switched",
+  "switch.reason": "Reason: {reason}",
+  "switch.from": "From: {route}",
+  "switch.to": "To: {route}",
+  "time": "Time: {time}",
+  "error.title_primary": "🔴 Primary model call failed",
+  "error.title_current": "🔴 Current model call failed",
+  "error.model": "Model: {route}",
+  "error.detail": "Error: {reason}",
+  "error.recovered": "✅ Retried successfully",
+  "error.retrying": "Retrying; the model switches if the failures continue",
+  "recovery.title": "🟢 Switched back to the primary model",
+  "reason.retries": "{count} consecutive failures",
+  "reason.failed": "Call failed",
+  "suppressed": "({count} more notices suppressed by the rate limit)",
+  "route.with_provider": "{model} ({provider})",
+  "timeout_detail": "{reason} (waited {duration}s; watchdog {threshold}s)",
+  "timeout_detail_no_threshold": "{reason} (waited {duration}s)"
+}

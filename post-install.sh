@@ -161,13 +161,28 @@ else
   ok "Linked skill $SKILL_LINK"
 fi
 
-# ------------------------------------------------------------- 3. enable
+# --------------------------------------------------------- 3. config.toml
+# Local settings (language, rate limit, ...) live next to the plugin and are not
+# tracked by Git. Bootstrap from the template only when absent so a local file
+# with user edits is never overwritten.
+CONFIG_PATH="$PLUGIN_DIR/config.toml"
+if [[ -f "$CONFIG_PATH" ]]; then
+  ok "Keeping existing $CONFIG_PATH"
+elif [[ -f "$SCRIPT_DIR/config.example.toml" ]]; then
+  cp "$SCRIPT_DIR/config.example.toml" "$CONFIG_PATH"
+  ok "Created $CONFIG_PATH from config.example.toml"
+else
+  warn "No config.example.toml found; create $CONFIG_PATH manually"
+fi
+
+# ------------------------------------------------------------- 4. enable
 HERMES_HOME="$HERMES_ROOT" hermes "${profile_args[@]}" plugins enable model-switch-notify
 
-# ------------------------------------------------------------ 4. summary
+# ------------------------------------------------------------ 5. summary
 printf '\033[1;32m\nInstall summary\033[0m\n'
 printf '  Plugin:  %s\n' "$PLUGIN_DIR"
 printf '  Skill:   %s\n' "$SKILL_LINK"
+printf '  Config:  %s\n' "$CONFIG_PATH"
 printf '\033[1;32m\nNext steps:\033[0m\n'
 printf '  1. Run the tests:   python3 -m pytest tests/ -q\n'
 printf -v hermes_home_q '%q' "$HERMES_ROOT"

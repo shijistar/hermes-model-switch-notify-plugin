@@ -1,0 +1,20 @@
+[notify]
+# Master switch. false disables every hook.
+enabled = true
+
+# Log notices instead of sending them to Feishu.
+dry_run = false
+
+# Maximum notices per minute per session; extra ones are suppressed.
+rate_per_min = 10
+
+# How long an error is held so a following switch can merge into one message.
+error_hold_seconds = 8.0
+
+# Send every notice to this Feishu chat id (oc_/ou_/on_), ignoring the session.
+# Leave empty to notify the chat the session runs in.
+force_chat = ""
+
+# Notice language: en | zh-CN | zh-TW | auto
+#   auto = follow the Hermes profile ui.language, then LANG, then en
+language = "en"

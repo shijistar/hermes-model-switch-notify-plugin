@@ -15,5 +15,8 @@ __pycache__/
 !.env.example
 *.log
 
+# Local configuration (created from config.example.toml)
+/config.toml
+
 # Local deployment artifacts
 *.bak.*

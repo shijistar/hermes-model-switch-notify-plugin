@@ -3,6 +3,28 @@
 All notable changes to this project are documented here. Headings are dates
 (`## YYYY-MM-DD`), not version numbers.
 
+## 2026-11-06
+
+### 0.2.0 — localization and config.toml
+
+- Notice copy is localized into English, Simplified Chinese and Traditional
+  Chinese (18 message keys in `locales/*.json`). English is the default; set
+  `[notify] language` to `zh-CN`, `zh-TW` or `auto`.
+- `auto` follows the profile `ui.language`, then `LC_ALL`/`LC_MESSAGES`/`LANG`,
+  then English. Unknown languages and missing keys fall back through
+  `zh-TW -> zh-CN -> en`.
+- All runtime settings moved to `config.toml` (`enabled`, `dry_run`,
+  `rate_per_min`, `error_hold_seconds`, `force_chat`, `language`). The
+  `MODEL_WATCH_*` environment variables still override the file.
+- The installer bootstraps `config.toml` from `config.example.toml` only when it
+  is absent; the file is gitignored.
+- Timeout notices now show the observed wait and the watchdog budget, e.g.
+  `timeout (waited 180.4s; watchdog 180s)`.
+
+### 1.1.0 — skill
+
+- Documents the config file, language selection and the timeout detail.
+
 ## 2026-11-01
 
 ### 0.1.1 — review follow-ups
