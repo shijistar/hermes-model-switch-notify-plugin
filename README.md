@@ -39,16 +39,21 @@ the per-call hooks and reports each event as it happens.
 # the --install-plugin and --hermes-home variants.
 ./post-install.sh --profile <name>
 
-# Verify registration
-hermes plugins info model-switch-notify
+# Verify registration (use -p default for the default profile; prefix
+# HERMES_HOME=<hermes-home> when you installed into a custom root)
+hermes -p <name> plugins info model-switch-notify
 
 # Run the test suite
 python3 -m pytest tests/ -q
 ```
 
 The gateway hot-reloads plugin hooks, so a new install is usually active after
-`hermes plugins enable model-switch-notify`. If hooks were already wired for an
-older build, restart the gateway (`/restart` in chat).
+`hermes -p <name> plugins enable model-switch-notify`. If hooks were already
+wired for an older build, restart the gateway (`/restart` in chat).
+
+The gateway only loads plugins from the home it was started with: when you
+install into a non-default `--hermes-home`/`HERMES_HOME`, start or restart it
+with that same home.
 
 ## What the user sees
 
