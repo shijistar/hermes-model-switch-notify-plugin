@@ -62,16 +62,21 @@ previously wired hooks stay until restart.
 
 ## Configuration
 
-Variables live in the profile `.env` (not `config.yaml`), so they are scoped to
-the profile that runs the plugin.
+Settings live in `config.toml` beside the plugin (created from
+`config.example.toml` on install; gitignored). Environment variables override
+the file, which is handy for one-off debugging.
 
-| Variable | Default | Behaviour |
-| --- | --- | --- |
-| `MODEL_WATCH_ENABLED` | `1` | `0/false/no/off` disables both hooks |
-| `MODEL_WATCH_DRY_RUN` | `0` | Log `would send` lines instead of calling Feishu |
-| `MODEL_WATCH_RATE_PER_MIN` | `10` | Per-session sends per 60s; overflow is counted |
-| `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8` | How long an error waits for a switch before it is reported alone |
-| `MODEL_WATCH_FORCE_CHAT` | empty | Force a chat id (`oc_…`) for testing; bypasses platform gating, so notices from non-Feishu sessions can be pushed into the forced chat — testing only |
+| Setting              | Env override                     | Default | Behaviour                                                                     |
+| -------------------- | -------------------------------- | ------- | ----------------------------------------------------------------------------- |
+| `enabled`            | `MODEL_WATCH_ENABLED`            | `true`  | `false` disables both hooks                                                   |
+| `dry_run`            | `MODEL_WATCH_DRY_RUN`            | `false` | Log `would send` lines instead of calling Feishu                              |
+| `rate_per_min`       | `MODEL_WATCH_RATE_PER_MIN`       | `10`    | Per-session sends per 60s; overflow is counted                                |
+| `error_hold_seconds` | `MODEL_WATCH_ERROR_HOLD_SECONDS` | `8.0`   | How long an error waits for a switch before it is reported alone              |
+| `force_chat`         | `MODEL_WATCH_FORCE_CHAT`         | empty   | Force a chat id (`oc_…`) for testing; bypasses platform gating — testing only |
+| `language`           | `MODEL_WATCH_LANGUAGE`           | `en`    | `en`, `zh-CN`, `zh-TW`, or `auto` (profile `ui.language` → `LANG` → `en`)     |
+
+A missing, unreadable or malformed `config.toml` falls back to these defaults
+with a warning; hook callbacks never raise because of configuration.
 
 The primary route is read from the profile `config.yaml`:
 
@@ -86,12 +91,18 @@ A route counts as "primary" when the model matches after stripping any
 
 ## Message contracts
 
-| Event | Trigger | Message |
-| --- | --- | --- |
-| Switch | `post_api_request` reports a different route | `⚠️ 模型已切换` + cause + old/new route + time |
-| Failure | `api_request_error` on the active route, no switch within the hold window | `🔴 主模型调用失败` (or `当前模型调用失败` when already on a fallback) |
-| Retry recovered | same route succeeds after a held error | failure text + `已自动重试成功` |
-| Recovery | route returns to the configured primary after an announced fallback | `🟢 已切回主模型` |
+Copy is localized (`en` by default, plus `zh-CN` and `zh-TW`); the messages
+below are the English text.
+
+| Event           | Trigger                                                                   | Message                                                                                       |
+| --------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Switch          | `post_api_request` reports a different route                              | `⚠️ Model switched` + cause + old/new route + time                                            |
+| Failure         | `api_request_error` on the active route, no switch within the hold window | `🔴 Primary model call failed` (or `🔴 Current model call failed` when already on a fallback) |
+| Retry recovered | same route succeeds after a held error                                    | failure text + `✅ Retried successfully`                                                      |
+| Recovery        | route returns to the configured primary after an announced fallback       | `🟢 Switched back to the primary model`                                                       |
+
+A `timeout` reason also reports the observed wait and the watchdog budget:
+`timeout (waited 180.4s; watchdog 180s)`.
 
 Merging: when a switch arrives inside the hold window, the failure text is not
 sent separately; the switch message carries the cause and the failure count.
@@ -102,7 +113,7 @@ Identical failures are merged by the hold window instead of being de-duplicated.
 
 Rate limiting: the 60s window is per session and shared by every message type.
 Overflow increments a counter; the next delivered message ends with
-`（期间另有 N 条通知被限流省略）`.
+`(N more notices suppressed by the rate limit)`.
 
 ## How it works
 
@@ -144,15 +155,15 @@ api_request_error(status_code, reason, retryable, …)
 
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| No messages at all | Plugin not loaded in the gateway | `hermes -p <name> plugins info model-switch-notify`; reload or `/restart` |
-| Code changes have no effect | A stale `__pycache__` next to the plugin | `rm -rf <plugin>/__pycache__`, then reload |
-| `plugins info` shows an older version | A `plugins/*.bak.*` copy shadows the symlink (same manifest name, last one wins) | Move the backup to `<profile>/plugin-backups/`, then reload |
-| `HTTP 400 … invalid receive_id` | Sending to a session id instead of a chat id | Check `sessions.source`; use a Feishu session or `MODEL_WATCH_FORCE_CHAT` |
-| Nothing on CLI runs | By design: `platform=cli` has no Feishu target | Test from a Feishu chat |
-| Duplicate notices at turn end | Hermes' built-in fallback notice still fires | Set `suppress_warning_notifications: true` for feishu in display config, or ignore |
-| `FEISHU_APP_ID/SECRET missing` | Profile `.env` not found | Confirm `hermes -p <profile> config env-path` |
+| Symptom                               | Cause                                                                            | Fix                                                                                |
+| ------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| No messages at all                    | Plugin not loaded in the gateway                                                 | `hermes -p <name> plugins info model-switch-notify`; reload or `/restart`          |
+| Code changes have no effect           | A stale `__pycache__` next to the plugin                                         | `rm -rf <plugin>/__pycache__`, then reload                                         |
+| `plugins info` shows an older version | A `plugins/*.bak.*` copy shadows the symlink (same manifest name, last one wins) | Move the backup to `<profile>/plugin-backups/`, then reload                        |
+| `HTTP 400 … invalid receive_id`       | Sending to a session id instead of a chat id                                     | Check `sessions.source`; use a Feishu session or `MODEL_WATCH_FORCE_CHAT`          |
+| Nothing on CLI runs                   | By design: `platform=cli` has no Feishu target                                   | Test from a Feishu chat                                                            |
+| Duplicate notices at turn end         | Hermes' built-in fallback notice still fires                                     | Set `suppress_warning_notifications: true` for feishu in display config, or ignore |
+| `FEISHU_APP_ID/SECRET missing`        | Profile `.env` not found                                                         | Confirm `hermes -p <profile> config env-path`                                      |
 
 ## Uninstall
 

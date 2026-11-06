@@ -7,11 +7,11 @@ chat in real time.
 
 ## Modules
 
-| Path        | What it is                                                    | Key files                                |
-| ----------- | ------------------------------------------------------------- | ---------------------------------------- |
-| repo root   | Hermes plugin package: hook handlers, state machine, Feishu client | `__init__.py`, `model_switch_notify.py`, `plugin.yaml` |
-| `tests/`    | Pytest suites (state machine, delivery, registration, profile detection, installer) | `conftest.py`, `test_state_machine.py`, `test_delivery.py`, `test_plugin.py`, `test_installer.py` |
-| `skill/`    | Hermes agent skill for installing and operating the plugin    | `SKILL.md`, `README.md`                  |
+| Path      | What it is                                                                          | Key files                                                                                         |
+| --------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| repo root | Hermes plugin package: hook handlers, state machine, Feishu client                  | `__init__.py`, `model_switch_notify.py`, `plugin.yaml`                                            |
+| `tests/`  | Pytest suites (state machine, delivery, registration, profile detection, installer) | `conftest.py`, `test_state_machine.py`, `test_delivery.py`, `test_plugin.py`, `test_installer.py` |
+| `skill/`  | Hermes agent skill for installing and operating the plugin                          | `SKILL.md`, `README.md`                                                                           |
 
 The repository root **is** the plugin package: `plugin.yaml` and `__init__.py`
 live at the top level, and `hermes plugins install` clones the whole repository.
@@ -56,11 +56,11 @@ python3 -m pytest tests/ -v     # per-test detail
 The project tracks module versions in **two** places. The CHANGELOG uses
 **date headings** (`## YYYY-MM-DD`), not version numbers:
 
-| Place           | Field                    | Current   |
-| --------------- | ------------------------ | --------- |
-| `plugin.yaml`   | `version`                | 0.1.1     |
-| `skill/SKILL.md`| frontmatter `version`    | 1.0.1     |
-| `CHANGELOG.md`  | `## YYYY-MM-DD` headings | 2026-11-01 |
+| Place            | Field                    | Current    |
+| ---------------- | ------------------------ | ---------- |
+| `plugin.yaml`    | `version`                | 0.1.1      |
+| `skill/SKILL.md` | frontmatter `version`    | 1.0.1      |
+| `CHANGELOG.md`   | `## YYYY-MM-DD` headings | 2026-11-01 |
 
 Module versions are independent of each other and of the CHANGELOG.
 
@@ -69,10 +69,10 @@ Module versions are independent of each other and of the CHANGELOG.
 Every module version bump MUST also create a tag of the form
 `<type>@<version>` on the merge commit in `master`:
 
-| Module | Tag prefix | Example         |
-| ------ | ---------- | --------------- |
-| plugin | `plugin@`  | `plugin@0.1.1`  |
-| skill  | `skill@`   | `skill@1.0.1`   |
+| Module | Tag prefix | Example        |
+| ------ | ---------- | -------------- |
+| plugin | `plugin@`  | `plugin@0.1.1` |
+| skill  | `skill@`   | `skill@1.0.1`  |
 
 - Tag only the modules whose version actually changed.
 - Tags are created on `master` **after** the PR is merged, never on the feature
@@ -107,8 +107,10 @@ user-visible.
 ### 3. Language
 
 Documentation, code comments, docstrings, commit messages and PR text are
-written in **English**. The exception is user-facing message literals sent to
-Feishu (Chinese), which are product strings and must stay as-is.
+written in **English**. User-facing notice copy lives in `locales/*.json`
+(`en.json`, `zh-CN.json`, `zh-TW.json`) and is not a source-language exception:
+when a message key changes, update all three files together — the i18n test
+asserts that their key sets match.
 
 ## Git workflow
 

@@ -29,7 +29,10 @@ What it does:
    real directory is moved to `<profile>/plugin-backups/`, never deleted; a
    plugin directory that already is this checkout is left untouched).
 2. Links `skill/` into the profile's `skills/devops/`.
-3. Enables the plugin in the profile config, passing `-p <name>` to every
+3. Creates `config.toml` next to the plugin from `config.example.toml` when it
+   is absent; an existing file is kept untouched. Review `[notify]` there —
+   `language` defaults to `en`, and `zh-CN`/`zh-TW`/`auto` are also available.
+4. Enables the plugin in the profile config, passing `-p <name>` to every
    Hermes command it runs.
 
 Then confirm the profile `.env` carries `FEISHU_APP_ID` and `FEISHU_APP_SECRET`
