@@ -64,6 +64,15 @@ def test_env_overrides_config(monkeypatch, tmp_path):
     assert msn._language() == "zh-CN"
 
 
+def test_invalid_env_falls_through_to_config(monkeypatch, tmp_path):
+    """A typo in the env override must not discard a valid config.toml value."""
+    _use_config(monkeypatch, tmp_path, "[notify]\nrate_per_min = 3\nlanguage = \"zh-TW\"\n")
+    monkeypatch.setenv("MODEL_WATCH_RATE_PER_MIN", "abc")
+    monkeypatch.setenv("MODEL_WATCH_LANGUAGE", "fr")
+    assert msn._rate_limit() == 3
+    assert msn._language() == "zh-TW"
+
+
 def test_invalid_values_fall_back(monkeypatch, tmp_path):
     _use_config(
         monkeypatch,

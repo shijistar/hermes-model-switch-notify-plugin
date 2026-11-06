@@ -18,7 +18,9 @@ All notable changes to this project are documented here. Headings are dates
   `zh-TW -> zh-CN -> en`.
 - All runtime settings moved to `config.toml` (`enabled`, `dry_run`,
   `rate_per_min`, `error_hold_seconds`, `force_chat`, `language`). The
-  `MODEL_WATCH_*` environment variables still override the file.
+  `MODEL_WATCH_*` environment variables still override the file; an invalid
+  override now falls through to the config value instead of reverting to the
+  built-in default.
 - The installer bootstraps `config.toml` from `config.example.toml` only when it
   is absent; the file is gitignored.
 - Timeout notices now show the observed wait and the watchdog budget, e.g.

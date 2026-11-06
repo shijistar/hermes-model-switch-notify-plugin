@@ -106,6 +106,7 @@ def reset_config_cache() -> None:
 
 
 def _as_bool(value: Any) -> bool | None:
+    """Coerce an env/config value to bool, or None when unrecognised."""
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -118,6 +119,7 @@ def _as_bool(value: Any) -> bool | None:
 
 
 def _as_int(value: Any, minimum: int = 0) -> int | None:
+    """Coerce to int, or None when non-numeric or below *minimum*."""
     if isinstance(value, bool):
         return None
     try:
@@ -128,6 +130,7 @@ def _as_int(value: Any, minimum: int = 0) -> int | None:
 
 
 def _as_float(value: Any, minimum: float = 0.0) -> float | None:
+    """Coerce to float, or None when non-numeric or below *minimum*."""
     if isinstance(value, bool):
         return None
     try:
@@ -145,7 +148,6 @@ def _setting(name: str, env_name: str, coerce) -> Any:
         if value is not None:
             return value
         logger.warning("model-switch-notify: ignoring invalid %s=%r", env_name, raw)
-        return None
     section = _config()
     if name in section:
         value = coerce(section[name])
@@ -592,18 +594,24 @@ _locale_cache: dict[str, dict[str, str]] = {}
 
 
 def _config_language() -> str:
+    """The language from config.toml, defaulting to English."""
     value = _config().get("language", _DEFAULT_LANGUAGE)
     return value if isinstance(value, str) and value.strip() else _DEFAULT_LANGUAGE
 
 
 def _language() -> str:
+    """Effective language: env override, then config.toml, then English."""
     raw = os.environ.get("MODEL_WATCH_LANGUAGE")
-    if raw is None:
-        raw = _config_language()
-    return _normalize_language(raw)
+    if raw is not None:
+        resolved = _resolve_language(raw)
+        if resolved is not None:
+            return resolved
+        logger.warning("model-switch-notify: ignoring invalid MODEL_WATCH_LANGUAGE=%r", raw)
+    return _resolve_language(_config_language()) or _DEFAULT_LANGUAGE
 
 
 def _language_from_locale(raw: str) -> str | None:
+    """Map a POSIX locale (``zh_HK.UTF-8``) to a supported language code."""
     value = raw.split(".")[0].split("@")[0].strip().lower().replace("_", "-")
     if not value:
         return None
@@ -643,6 +651,7 @@ def _ui_language() -> str | None:
 
 
 def _detect_language() -> str:
+    """Detection for ``auto``: Hermes UI language, then the POSIX locale."""
     detected = _ui_language()
     if detected:
         return detected
@@ -655,7 +664,12 @@ def _detect_language() -> str:
     return _DEFAULT_LANGUAGE
 
 
-def _normalize_language(value: Any) -> str:
+def _resolve_language(value: Any) -> str | None:
+    """Map a language alias (``en-US``, ``zh_Hant``) to a supported code.
+
+    Returns ``None`` for an unrecognised value so callers can fall through to
+    the next source instead of silently pinning the default.
+    """
     raw = str(value or "").strip().lower().replace("_", "-")
     if raw == "auto":
         return _detect_language()
@@ -667,11 +681,22 @@ def _normalize_language(value: Any) -> str:
         return "zh-HK"
     if raw in {"zh-tw", "zh-hant"}:
         return "zh-TW"
-    logger.warning("model-switch-notify: unsupported language %r; using %s", value, _DEFAULT_LANGUAGE)
-    return _DEFAULT_LANGUAGE
+    return None
+
+
+def _normalize_language(value: Any) -> str:
+    """Fold aliases onto a supported code, falling back to English."""
+    resolved = _resolve_language(value)
+    if resolved is None:
+        logger.warning(
+            "model-switch-notify: unsupported language %r; using %s", value, _DEFAULT_LANGUAGE
+        )
+        return _DEFAULT_LANGUAGE
+    return resolved
 
 
 def _locale(language: str) -> dict[str, str]:
+    """Load and cache ``locales/<language>.json``; failures yield an empty map."""
     with _locale_lock:
         cached = _locale_cache.get(language)
         if cached is not None:
@@ -696,6 +721,7 @@ def reset_locale_cache() -> None:
 
 
 def _fallback_chain(language: str) -> tuple[str, ...]:
+    """Languages to try, in order, when a key is missing."""
     if language == "zh-HK":
         return ("zh-HK", "zh-TW", "zh-CN", "en")
     if language == "zh-TW":
@@ -706,6 +732,7 @@ def _fallback_chain(language: str) -> tuple[str, ...]:
 
 
 def _t(key: str, **kwargs: Any) -> str:
+    """Render a localized message, falling back through the chain to the key."""
     for code in _fallback_chain(_language()):
         template = _locale(code).get(key)
         if template is None:
@@ -718,6 +745,7 @@ def _t(key: str, **kwargs: Any) -> str:
 
 
 def _route_label(model: Any, provider: Any) -> str:
+    """Format a route for display, localized."""
     return _t("route.with_provider", model=model, provider=provider) if provider else str(model)
 
 
@@ -791,6 +819,7 @@ def _configured_stale_timeout(provider: str, model: str) -> float | None:
 
 
 def _watchdog_threshold(provider: str, model: str) -> float | None:
+    """The configured stale-stream budget for this route."""
     explicit = _configured_stale_timeout(provider, model)
     if explicit is not None:
         return explicit
@@ -799,6 +828,7 @@ def _watchdog_threshold(provider: str, model: str) -> float | None:
 
 
 def _timeout_text(text: str, pending: dict[str, Any]) -> str:
+    """Annotate a timeout with the observed wait and the watchdog budget."""
     duration = pending.get("duration")
     if isinstance(duration, bool) or not isinstance(duration, (int, float)) or duration <= 0:
         return text
