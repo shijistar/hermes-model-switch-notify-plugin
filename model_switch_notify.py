@@ -828,7 +828,15 @@ def _watchdog_threshold(provider: str, model: str) -> float | None:
 
 
 def _timeout_text(text: str, pending: dict[str, Any]) -> str:
-    """Annotate a timeout with the observed wait and the watchdog budget."""
+    """Explain a timeout without implying the stale-stream watchdog fired.
+
+    ``duration`` is the observed wait from the API hook; ``threshold`` is the
+    *configured* stale-stream budget, not necessarily what ended this request.
+    Transport failures (ReadTimeout, APITimeoutError, ...) can arrive well before
+    that budget, so naming it there would make a short wait look like a premature
+    watchdog kill. Only mention the watchdog when the wait actually reached it;
+    otherwise report the transport error type.
+    """
     duration = pending.get("duration")
     if isinstance(duration, bool) or not isinstance(duration, (int, float)) or duration <= 0:
         return text
@@ -836,6 +844,16 @@ def _timeout_text(text: str, pending: dict[str, Any]) -> str:
         str(pending.get("provider") or ""), str(pending.get("model") or "")
     )
     if threshold is None:
+        return _t("timeout_detail_no_threshold", reason=text, duration=f"{duration:.1f}")
+    if duration < threshold:
+        error_type = str(pending.get("error_type") or "").strip()
+        if error_type:
+            return _t(
+                "timeout_detail_transport",
+                reason=text,
+                duration=f"{duration:.1f}",
+                error_type=error_type,
+            )
         return _t("timeout_detail_no_threshold", reason=text, duration=f"{duration:.1f}")
     return _t(
         "timeout_detail",
@@ -1041,6 +1059,13 @@ def on_api_request_error(**kwargs: Any) -> None:
             pending["reason"] = re.sub(r"^[A-Za-z_]+\.", "", str(reason))
         pending["retryable"] = kwargs.get("retryable")
         pending["is_primary"] = is_primary
+        # Keep only the exception class: the message can carry upstream payloads
+        # or credentials and must never reach a Feishu notice.
+        error = kwargs.get("error")
+        if isinstance(error, dict):
+            error_type = re.sub(r"[^A-Za-z0-9_.]", "", str(error.get("type") or ""))[:64]
+            if error_type:
+                pending["error_type"] = error_type
 
 
 def register(ctx) -> None:

@@ -169,3 +169,50 @@ def test_hong_kong_falls_back_to_taiwan(monkeypatch):
     _set_language(monkeypatch, "zh-HK")
     msn._locale("zh-HK").pop("switch.title", None)
     assert msn._t("switch.title") == "⚠️ 模型已切換"
+
+
+def test_short_timeout_reports_transport_not_watchdog(monkeypatch):
+    """A transport failure at 31.7s is not a 180s stale-stream watchdog kill."""
+    _set_language(monkeypatch, "en")
+    monkeypatch.delenv("HERMES_STREAM_STALE_TIMEOUT", raising=False)
+    pending = {
+        "reason": "timeout", "duration": 31.7, "provider": "opencode-go",
+        "model": "hy4", "error_type": "ReadTimeout", "count": 1,
+    }
+    text = msn._reason_text(pending)
+    assert "waited 31.7s" in text
+    assert "transport: ReadTimeout" in text
+    assert "watchdog" not in text
+
+
+def test_short_timeout_without_error_type_degrades_to_duration(monkeypatch):
+    """No exception class available: fall back to the duration-only copy."""
+    _set_language(monkeypatch, "en")
+    monkeypatch.delenv("HERMES_STREAM_STALE_TIMEOUT", raising=False)
+    text = msn._reason_text({
+        "reason": "timeout", "duration": 39.8, "provider": "", "model": "",
+    })
+    assert "waited 39.8s" in text
+    assert "watchdog" not in text
+    assert "transport" not in text
+
+
+def test_timeout_at_threshold_still_names_watchdog(monkeypatch):
+    """Exactly reaching the configured budget keeps the watchdog copy."""
+    _set_language(monkeypatch, "en")
+    monkeypatch.delenv("HERMES_STREAM_STALE_TIMEOUT", raising=False)
+    pending = {
+        "reason": "timeout", "duration": 180.0, "provider": "", "model": "",
+        "error_type": "ReadTimeout",
+    }
+    assert "watchdog 180s" in msn._reason_text(pending)
+
+
+def test_transport_copy_is_localized(monkeypatch):
+    """The transport-copy key is translated, not left as an English fallback."""
+    _set_language(monkeypatch, "zh-CN")
+    text = msn._reason_text({
+        "reason": "timeout", "duration": 31.7, "error_type": "ReadTimeout",
+    })
+    assert "传输层：ReadTimeout" in text
+    assert "watchdog" not in text
