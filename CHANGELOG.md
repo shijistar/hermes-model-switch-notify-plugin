@@ -3,6 +3,23 @@
 All notable changes to this project are documented here. Headings are dates
 (`## YYYY-MM-DD`), not version numbers.
 
+## 2026-11-09
+
+### 0.2.1 — distinguish transport timeouts from watchdog kills
+
+- Timeout notices no longer pair a short observed wait with the configured
+  stale-stream budget. A transport failure arriving before that budget now
+  reports the exception class (`timeout (waited 31.7s; transport: ReadTimeout)`)
+  instead of implying the 180s watchdog fired; the watchdog copy is kept only
+  when the observed wait reached the configured budget.
+- The API error hook retains only the exception class, never the upstream error
+  message, so provider payloads and credentials cannot reach a Feishu notice.
+- Added `timeout_detail_transport` to all four locales; the existing i18n
+  key-set test covers parity.
+- The test suite no longer reads the developer's real Hermes profile or an
+  exported `HERMES_STREAM_STALE_TIMEOUT`, so a machine-specific stale budget can
+  no longer flip the timeout-copy assertions that assert the 180s default.
+
 ## 2026-11-06
 
 ### 0.2.0 — localization and config.toml

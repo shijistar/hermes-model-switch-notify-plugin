@@ -249,3 +249,35 @@ def test_force_chat_with_invalid_prefix_is_ignored(monkeypatch):
     msn._dispatch("force-session", st, "hello")
 
     assert captured and captured[0][0] == "oc_real"
+
+
+def test_error_hook_keeps_exception_type_not_message(sent):
+    """Only the exception class is retained; upstream messages may hold secrets."""
+    post()
+    msn.on_api_request_error(
+        session_id=SID, model=PRIMARY[0], provider=PRIMARY[1],
+        status_code=None, reason="FailoverReason.timeout", retryable=True,
+        platform="feishu", api_duration=31.7,
+        error={"type": "ReadTimeout", "message": "Authorization: Bearer REDACTED"},
+    )
+    pending = msn._state(SID).get("pending_error")
+    assert pending is not None
+    assert pending["error_type"] == "ReadTimeout"
+    assert "message" not in pending
+    assert "REDACTED" not in str(pending)
+
+
+def test_error_hook_clears_stale_exception_type(sent):
+    """A later error without an exception class must not inherit the previous one."""
+    post()
+    msn.on_api_request_error(
+        session_id=SID, model=PRIMARY[0], provider=PRIMARY[1],
+        reason="FailoverReason.timeout", platform="feishu", api_duration=31.7,
+        error={"type": "ReadTimeout", "message": "x"},
+    )
+    assert msn._state(SID)["pending_error"]["error_type"] == "ReadTimeout"
+    msn.on_api_request_error(
+        session_id=SID, model=PRIMARY[0], provider=PRIMARY[1],
+        reason="FailoverReason.timeout", platform="feishu", api_duration=39.8,
+    )
+    assert msn._state(SID)["pending_error"]["error_type"] == ""

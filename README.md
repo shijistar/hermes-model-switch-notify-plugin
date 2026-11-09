@@ -79,8 +79,11 @@ Error: HTTP 500 · server_error · ✅ Retried successfully
 Model: deepseek-v4.1-flash (opencode-go)
 ```
 
-A timeout also reports the observed wait and the watchdog budget:
-`timeout (waited 180.4s; watchdog 180s)`.
+A timeout reports the observed wait. When that wait reached the configured
+stale-stream budget, the notice names it:
+`timeout (waited 180.4s; watchdog 180s)`. A transport-level failure arriving
+earlier reports the exception class instead, so a short wait is never presented
+as a watchdog kill: `timeout (waited 31.7s; transport: ReadTimeout)`.
 
 ## Configuration
 

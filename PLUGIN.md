@@ -101,8 +101,11 @@ below are the English text.
 | Retry recovered | same route succeeds after a held error                                    | failure text + `✅ Retried successfully`                                                      |
 | Recovery        | route returns to the configured primary after an announced fallback       | `🟢 Switched back to the primary model`                                                       |
 
-A `timeout` reason also reports the observed wait and the watchdog budget:
-`timeout (waited 180.4s; watchdog 180s)`.
+A `timeout` reason reports the observed wait. The configured stale-stream
+budget is named only when the wait actually reached it:
+`timeout (waited 180.4s; watchdog 180s)`. Transport failures that arrive earlier
+name the exception class instead, so a short wait is not mistaken for a watchdog
+kill: `timeout (waited 31.7s; transport: ReadTimeout)`.
 
 Merging: when a switch arrives inside the hold window, the failure text is not
 sent separately; the switch message carries the cause and the failure count.

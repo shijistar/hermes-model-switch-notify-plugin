@@ -32,6 +32,13 @@ def clean_plugin_state(monkeypatch):
     # Never read a developer's real config.toml; tests set values explicitly.
     monkeypatch.setattr(msn, "_CONFIG_PATH", ROOT / "tests" / ".no-config.toml")
 
+    # Never read a developer's real profile either: a profile that configures
+    # providers.<id>.stale_timeout_seconds would silently change the timeout copy,
+    # and an exported HERMES_STREAM_STALE_TIMEOUT would do the same. Point the home
+    # at a path that cannot exist; the profile-resolution tests override this.
+    monkeypatch.setattr(msn, "_HERMES_HOME", ROOT / "tests" / ".no-hermes-home")
+    monkeypatch.delenv("HERMES_STREAM_STALE_TIMEOUT", raising=False)
+
     monkeypatch.setattr(
         msn, "configured_primary", lambda: ("deepseek-v4.1-flash", "opencode-go")
     )

@@ -62,9 +62,9 @@ The project tracks module versions in **two** places. The CHANGELOG uses
 
 | Place            | Field                    | Current    |
 | ---------------- | ------------------------ | ---------- |
-| `plugin.yaml`    | `version`                | 0.1.1      |
-| `skill/SKILL.md` | frontmatter `version`    | 1.0.1      |
-| `CHANGELOG.md`   | `## YYYY-MM-DD` headings | 2026-11-01 |
+| `plugin.yaml`    | `version`                | 0.2.1      |
+| `skill/SKILL.md` | frontmatter `version`    | 1.1.0      |
+| `CHANGELOG.md`   | `## YYYY-MM-DD` headings | 2026-11-09 |
 
 Module versions are independent of each other and of the CHANGELOG.
 
@@ -115,7 +115,7 @@ user-visible.
 Documentation, code comments, docstrings, commit messages and PR text are
 written in **English**. User-facing notice copy lives in `locales/*.json`
 (`en.json`, `zh-CN.json`, `zh-TW.json`, `zh-HK.json`) and is not a source-language exception:
-when a message key changes, update all three files together — the i18n test
+when a message key changes, update all four files together — the i18n test
 asserts that their key sets match.
 
 ## Git workflow

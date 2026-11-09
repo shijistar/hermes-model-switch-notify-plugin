@@ -16,5 +16,6 @@
   "suppressed": "（期间另有 {count} 条通知被限流省略）",
   "route.with_provider": "{model}（{provider}）",
   "timeout_detail": "{reason}（已等待 {duration}s；watchdog {threshold}s）",
-  "timeout_detail_no_threshold": "{reason}（已等待 {duration}s）"
+  "timeout_detail_no_threshold": "{reason}（已等待 {duration}s）",
+  "timeout_detail_transport": "{reason}（已等待 {duration}s；传输层：{error_type}）"
 }

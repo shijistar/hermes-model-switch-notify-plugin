@@ -16,5 +16,6 @@
   "suppressed": "({count} more notices suppressed by the rate limit)",
   "route.with_provider": "{model} ({provider})",
   "timeout_detail": "{reason} (waited {duration}s; watchdog {threshold}s)",
-  "timeout_detail_no_threshold": "{reason} (waited {duration}s)"
+  "timeout_detail_no_threshold": "{reason} (waited {duration}s)",
+  "timeout_detail_transport": "{reason} (waited {duration}s; transport: {error_type})"
 }
