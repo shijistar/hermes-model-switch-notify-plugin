@@ -227,3 +227,34 @@ def test_disabled_watchdog_budget_omits_watchdog_copy(monkeypatch):
     })
     assert "waited 31.7s" in text
     assert "watchdog" not in text
+
+
+def test_timeout_copy_never_reads_the_developer_profile():
+    """The suite's isolation invariant: no developer config.yaml is in reach.
+
+    conftest points ``_HERMES_HOME`` at a path that does not exist, so the formatter
+    cannot inherit a machine-specific provider budget. Without that guard a profile
+    pinning ``stale_timeout_seconds`` would flip the 31.7s assertions above.
+    """
+    assert not (msn.profile_home() / "config.yaml").exists()
+
+
+def test_configured_budget_still_overrides_the_isolated_default(monkeypatch, tmp_path):
+    """A profile budget of 30s must win over both the default and the env var.
+
+    Pairs with the invariant above: re-enabling the profile seam has to change the
+    copy, otherwise the isolation would be hiding a dead code path.
+    """
+    (tmp_path / "config.yaml").write_text(
+        "providers:\n  opencode-go:\n    stale_timeout_seconds: 30\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(msn, "profile_home", lambda: tmp_path)
+    _set_language(monkeypatch, "en")
+    pending = {
+        "reason": "timeout", "duration": 31.7, "provider": "opencode-go",
+        "model": "hy4", "error_type": "ReadTimeout", "count": 1,
+    }
+    text = msn._reason_text(pending)
+    assert "watchdog 30s" in text
+    assert "transport" not in text
+

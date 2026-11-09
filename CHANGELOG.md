@@ -16,6 +16,9 @@ All notable changes to this project are documented here. Headings are dates
   message, so provider payloads and credentials cannot reach a Feishu notice.
 - Added `timeout_detail_transport` to all four locales; the existing i18n
   key-set test covers parity.
+- The test suite no longer reads the developer's real Hermes profile or an
+  exported `HERMES_STREAM_STALE_TIMEOUT`, so a machine-specific stale budget can
+  no longer flip the timeout-copy assertions that assert the 180s default.
 
 ## 2026-11-06
 
