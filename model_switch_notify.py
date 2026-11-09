@@ -843,7 +843,7 @@ def _timeout_text(text: str, pending: dict[str, Any]) -> str:
     threshold = _watchdog_threshold(
         str(pending.get("provider") or ""), str(pending.get("model") or "")
     )
-    if threshold is None:
+    if threshold is None or threshold <= 0:
         return _t("timeout_detail_no_threshold", reason=text, duration=f"{duration:.1f}")
     if duration < threshold:
         error_type = str(pending.get("error_type") or "").strip()
@@ -1062,10 +1062,12 @@ def on_api_request_error(**kwargs: Any) -> None:
         # Keep only the exception class: the message can carry upstream payloads
         # or credentials and must never reach a Feishu notice.
         error = kwargs.get("error")
+        error_type = ""
         if isinstance(error, dict):
             error_type = re.sub(r"[^A-Za-z0-9_.]", "", str(error.get("type") or ""))[:64]
-            if error_type:
-                pending["error_type"] = error_type
+        # Always overwrite: a later error event without an exception class must
+        # not inherit the previous one and mislabel its transport.
+        pending["error_type"] = error_type
 
 
 def register(ctx) -> None:

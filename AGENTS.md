@@ -115,7 +115,7 @@ user-visible.
 Documentation, code comments, docstrings, commit messages and PR text are
 written in **English**. User-facing notice copy lives in `locales/*.json`
 (`en.json`, `zh-CN.json`, `zh-TW.json`, `zh-HK.json`) and is not a source-language exception:
-when a message key changes, update all three files together — the i18n test
+when a message key changes, update all four files together — the i18n test
 asserts that their key sets match.
 
 ## Git workflow

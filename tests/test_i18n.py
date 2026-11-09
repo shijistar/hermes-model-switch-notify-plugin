@@ -216,3 +216,14 @@ def test_transport_copy_is_localized(monkeypatch):
     })
     assert "传输层：ReadTimeout" in text
     assert "watchdog" not in text
+
+
+def test_disabled_watchdog_budget_omits_watchdog_copy(monkeypatch):
+    """A zero stale budget means no watchdog; never print 'watchdog 0s'."""
+    _set_language(monkeypatch, "en")
+    monkeypatch.setenv("HERMES_STREAM_STALE_TIMEOUT", "0")
+    text = msn._reason_text({
+        "reason": "timeout", "duration": 31.7, "error_type": "ReadTimeout",
+    })
+    assert "waited 31.7s" in text
+    assert "watchdog" not in text
